@@ -83,7 +83,7 @@ function DashboardView({ accounts, snapshots }: { accounts: ReturnType<typeof us
         const last = upTo[upTo.length - 1];
         if (!last) continue;
         if (isAsset(acct.category)) a += last.balance;
-        else if (isLiability(acct.category)) l += last.balance;
+        else if (isLiability(acct.category)) l += Math.abs(last.balance);
       }
       return { week: w.slice(5), net: a - l, assets: a, liabilities: l };
     });
