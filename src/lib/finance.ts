@@ -25,6 +25,11 @@ export const RETIREMENT_CATEGORIES: AccountCategory[] = ["retirement_401k","ira"
 
 export const isAsset = (c: AccountCategory) => ASSET_CATEGORIES.includes(c);
 export const isLiability = (c: AccountCategory) => LIABILITY_CATEGORIES.includes(c);
+export const accountType = (c: AccountCategory): "asset" | "liability" =>
+  isAsset(c) ? "asset" : "liability";
+/** Signed contribution to net worth: assets positive, liabilities negative. */
+export const signedBalance = (c: AccountCategory, balance: number): number =>
+  isLiability(c) ? -Math.abs(balance) : balance;
 
 export const fmtMoney = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n || 0);
