@@ -83,6 +83,7 @@ export type Database = {
           is_active: boolean
           member_id: string | null
           name: string
+          period: Database["public"]["Enums"]["budget_period"]
           start_date: string
         }
         Insert: {
@@ -96,6 +97,7 @@ export type Database = {
           is_active?: boolean
           member_id?: string | null
           name: string
+          period?: Database["public"]["Enums"]["budget_period"]
           start_date?: string
         }
         Update: {
@@ -109,6 +111,7 @@ export type Database = {
           is_active?: boolean
           member_id?: string | null
           name?: string
+          period?: Database["public"]["Enums"]["budget_period"]
           start_date?: string
         }
         Relationships: [
@@ -128,6 +131,51 @@ export type Database = {
           },
         ]
       }
+      household_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string
+          expires_at: string
+          household_id: string
+          id: string
+          invite_code: string | null
+          invite_token: string
+          invited_by: string
+          invited_email: string | null
+          role: Database["public"]["Enums"]["member_role"]
+          status: Database["public"]["Enums"]["invite_status"]
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          expires_at?: string
+          household_id: string
+          id?: string
+          invite_code?: string | null
+          invite_token?: string
+          invited_by?: string
+          invited_email?: string | null
+          role?: Database["public"]["Enums"]["member_role"]
+          status?: Database["public"]["Enums"]["invite_status"]
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          expires_at?: string
+          household_id?: string
+          id?: string
+          invite_code?: string | null
+          invite_token?: string
+          invited_by?: string
+          invited_email?: string | null
+          role?: Database["public"]["Enums"]["member_role"]
+          status?: Database["public"]["Enums"]["invite_status"]
+        }
+        Relationships: []
+      }
       household_members: {
         Row: {
           color: string | null
@@ -137,6 +185,8 @@ export type Database = {
           id: string
           name: string
           relationship: string | null
+          role: Database["public"]["Enums"]["member_role"]
+          user_id: string | null
         }
         Insert: {
           color?: string | null
@@ -146,6 +196,8 @@ export type Database = {
           id?: string
           name: string
           relationship?: string | null
+          role?: Database["public"]["Enums"]["member_role"]
+          user_id?: string | null
         }
         Update: {
           color?: string | null
@@ -155,6 +207,8 @@ export type Database = {
           id?: string
           name?: string
           relationship?: string | null
+          role?: Database["public"]["Enums"]["member_role"]
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -337,7 +391,10 @@ export type Database = {
         | "personal_loan"
         | "other_asset"
         | "other_liability"
+      budget_period: "daily" | "weekly" | "monthly"
       budget_type: "individual" | "combined"
+      invite_status: "pending" | "accepted" | "revoked" | "expired"
+      member_role: "owner" | "admin" | "member"
       ownership_type: "individual" | "joint"
       spending_category:
         | "food"
@@ -490,7 +547,10 @@ export const Constants = {
         "other_asset",
         "other_liability",
       ],
+      budget_period: ["daily", "weekly", "monthly"],
       budget_type: ["individual", "combined"],
+      invite_status: ["pending", "accepted", "revoked", "expired"],
+      member_role: ["owner", "admin", "member"],
       ownership_type: ["individual", "joint"],
       spending_category: [
         "food",

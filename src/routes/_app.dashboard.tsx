@@ -52,20 +52,23 @@ function DashboardView({ accounts, snapshots }: { accounts: ReturnType<typeof us
   const accountIds = new Set(accounts.map((a) => a.id));
   const filteredSnaps = useMemo(() => snapshots.filter((s) => accountIds.has(s.account_id)), [snapshots, accountIds]);
 
-  const sumBy = (catFilter: (c: string) => boolean, key: "current" | "previous") => accounts
+  const sumBy = (catFilter: (c: string) => boolean, key: "current" | "previous", absolute = false) => accounts
     .filter((a) => catFilter(a.category) && a.include_in_net_worth)
-    .reduce((sum, a) => sum + (balances.get(a.id)?.[key] ?? 0), 0);
+    .reduce((sum, a) => {
+      const v = balances.get(a.id)?.[key] ?? 0;
+      return sum + (absolute ? Math.abs(v) : v);
+    }, 0);
 
   const cash = sumBy((c) => CASH_CATEGORIES.includes(c as any), "current");
   const invest = sumBy((c) => INVESTMENT_CATEGORIES.includes(c as any), "current");
   const retire = sumBy((c) => RETIREMENT_CATEGORIES.includes(c as any), "current");
-  const debt = sumBy((c) => isLiability(c as any), "current");
+  const debt = sumBy((c) => isLiability(c as any), "current", true);
   const assets = sumBy((c) => isAsset(c as any), "current");
-  const liabs = sumBy((c) => isLiability(c as any), "current");
+  const liabs = sumBy((c) => isLiability(c as any), "current", true);
   const net = assets - liabs;
 
   const prevAssets = sumBy((c) => isAsset(c as any), "previous");
-  const prevLiabs = sumBy((c) => isLiability(c as any), "previous");
+  const prevLiabs = sumBy((c) => isLiability(c as any), "previous", true);
   const prevNet = prevAssets - prevLiabs;
   const weeklyChange = net - prevNet;
 
@@ -80,7 +83,7 @@ function DashboardView({ accounts, snapshots }: { accounts: ReturnType<typeof us
         const last = upTo[upTo.length - 1];
         if (!last) continue;
         if (isAsset(acct.category)) a += last.balance;
-        else if (isLiability(acct.category)) l += last.balance;
+        else if (isLiability(acct.category)) l += Math.abs(last.balance);
       }
       return { week: w.slice(5), net: a - l, assets: a, liabilities: l };
     });

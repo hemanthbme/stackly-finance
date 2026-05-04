@@ -24,7 +24,7 @@ export const Route = createFileRoute("/_app")({
 
 const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/weekly", label: "Weekly Entry", icon: CalendarRange },
+  { to: "/weekly", label: "Weekly Snapshot", icon: CalendarRange },
   { to: "/accounts", label: "Accounts", icon: Wallet },
   { to: "/members", label: "Members", icon: Users },
   { to: "/budget", label: "Daily Budget", icon: PiggyBank },

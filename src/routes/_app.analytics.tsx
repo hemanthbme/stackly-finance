@@ -29,7 +29,7 @@ function AnalyticsPage() {
         if (!last) continue;
         if (a.include_in_net_worth) {
           if (isAsset(a.category)) assets += last.balance;
-          if (isLiability(a.category)) liabs += last.balance;
+          if (isLiability(a.category)) liabs += Math.abs(last.balance);
         }
         if (a.category === categoryFilter) catSum += last.balance;
         if (a.id === accountId) point.account = last.balance;
