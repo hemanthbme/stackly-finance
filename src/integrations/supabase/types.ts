@@ -14,16 +14,341 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      accounts: {
+        Row: {
+          category: Database["public"]["Enums"]["account_category"]
+          created_at: string
+          created_by: string
+          household_id: string
+          id: string
+          include_in_net_worth: boolean
+          institution: string | null
+          is_active: boolean
+          member_id: string | null
+          name: string
+          ownership: Database["public"]["Enums"]["ownership_type"]
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["account_category"]
+          created_at?: string
+          created_by?: string
+          household_id: string
+          id?: string
+          include_in_net_worth?: boolean
+          institution?: string | null
+          is_active?: boolean
+          member_id?: string | null
+          name: string
+          ownership?: Database["public"]["Enums"]["ownership_type"]
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["account_category"]
+          created_at?: string
+          created_by?: string
+          household_id?: string
+          id?: string
+          include_in_net_worth?: boolean
+          institution?: string | null
+          is_active?: boolean
+          member_id?: string | null
+          name?: string
+          ownership?: Database["public"]["Enums"]["ownership_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounts_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "household_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budgets: {
+        Row: {
+          budget_type: Database["public"]["Enums"]["budget_type"]
+          created_at: string
+          created_by: string
+          daily_limit: number
+          end_date: string | null
+          household_id: string
+          id: string
+          is_active: boolean
+          member_id: string | null
+          name: string
+          start_date: string
+        }
+        Insert: {
+          budget_type: Database["public"]["Enums"]["budget_type"]
+          created_at?: string
+          created_by?: string
+          daily_limit: number
+          end_date?: string | null
+          household_id: string
+          id?: string
+          is_active?: boolean
+          member_id?: string | null
+          name: string
+          start_date?: string
+        }
+        Update: {
+          budget_type?: Database["public"]["Enums"]["budget_type"]
+          created_at?: string
+          created_by?: string
+          daily_limit?: number
+          end_date?: string | null
+          household_id?: string
+          id?: string
+          is_active?: boolean
+          member_id?: string | null
+          name?: string
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budgets_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budgets_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "household_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      household_members: {
+        Row: {
+          color: string | null
+          created_at: string
+          created_by: string
+          household_id: string
+          id: string
+          name: string
+          relationship: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          created_by?: string
+          household_id: string
+          id?: string
+          name: string
+          relationship?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          created_by?: string
+          household_id?: string
+          id?: string
+          name?: string
+          relationship?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "household_members_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      households: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      spending_entries: {
+        Row: {
+          amount: number
+          category: Database["public"]["Enums"]["spending_category"]
+          created_at: string
+          created_by: string
+          household_id: string
+          id: string
+          member_id: string | null
+          notes: string | null
+          payment_method: string | null
+          spent_at: string
+        }
+        Insert: {
+          amount: number
+          category?: Database["public"]["Enums"]["spending_category"]
+          created_at?: string
+          created_by?: string
+          household_id: string
+          id?: string
+          member_id?: string | null
+          notes?: string | null
+          payment_method?: string | null
+          spent_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: Database["public"]["Enums"]["spending_category"]
+          created_at?: string
+          created_by?: string
+          household_id?: string
+          id?: string
+          member_id?: string | null
+          notes?: string | null
+          payment_method?: string | null
+          spent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spending_entries_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spending_entries_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "household_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      weekly_snapshots: {
+        Row: {
+          account_id: string
+          balance: number
+          contribution: number | null
+          created_at: string
+          created_by: string
+          household_id: string
+          id: string
+          notes: string | null
+          payment: number | null
+          week_ending: string
+        }
+        Insert: {
+          account_id: string
+          balance?: number
+          contribution?: number | null
+          created_at?: string
+          created_by?: string
+          household_id: string
+          id?: string
+          notes?: string | null
+          payment?: number | null
+          week_ending: string
+        }
+        Update: {
+          account_id?: string
+          balance?: number
+          contribution?: number | null
+          created_at?: string
+          created_by?: string
+          household_id?: string
+          id?: string
+          notes?: string | null
+          payment?: number | null
+          week_ending?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weekly_snapshots_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weekly_snapshots_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_household_owner: { Args: { _household_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      account_category:
+        | "checking"
+        | "savings"
+        | "credit_card"
+        | "retirement_401k"
+        | "brokerage"
+        | "ira"
+        | "car_loan"
+        | "mortgage"
+        | "student_loan"
+        | "personal_loan"
+        | "other_asset"
+        | "other_liability"
+      budget_type: "individual" | "combined"
+      ownership_type: "individual" | "joint"
+      spending_category:
+        | "food"
+        | "coffee_snacks"
+        | "groceries"
+        | "gas_transportation"
+        | "shopping"
+        | "entertainment"
+        | "bills"
+        | "travel"
+        | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +475,34 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      account_category: [
+        "checking",
+        "savings",
+        "credit_card",
+        "retirement_401k",
+        "brokerage",
+        "ira",
+        "car_loan",
+        "mortgage",
+        "student_loan",
+        "personal_loan",
+        "other_asset",
+        "other_liability",
+      ],
+      budget_type: ["individual", "combined"],
+      ownership_type: ["individual", "joint"],
+      spending_category: [
+        "food",
+        "coffee_snacks",
+        "groceries",
+        "gas_transportation",
+        "shopping",
+        "entertainment",
+        "bills",
+        "travel",
+        "other",
+      ],
+    },
   },
 } as const
