@@ -181,7 +181,7 @@ function BudgetPage() {
     const spent = sumWindow(start, m.id);
     const remaining = limit - spent;
     return { member: m, limit, period, spent, remaining, hasBudget: !!ib };
-  }).filter((p) => showIndividualCards && (p.hasBudget || mode !== "combined"));
+  }).filter(() => showIndividualCards);
 
   // Trends
   const last7 = useMemo(() => {
