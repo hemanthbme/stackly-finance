@@ -38,6 +38,13 @@ interface Spending {
 function BudgetPage() {
   const { active } = useHousehold();
   const { data: members } = useMembers();
+  const { profile } = useProfile();
+  const tz = profile?.user_timezone || "UTC";
+  const weekStartDay = profile?.week_start || "sunday";
+  const today = todayInTz(tz);
+  const weekStart = startOfWeekInTz(tz, weekStartDay);
+  const monthStart = startOfMonthInTz(tz);
+
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [spending, setSpending] = useState<Spending[]>([]);
   const [openBudget, setOpenBudget] = useState(false);
@@ -83,13 +90,15 @@ function BudgetPage() {
   const [sMember, setSMember] = useState("");
   const [sCategory, setSCategory] = useState<string>("food");
   const [sNotes, setSNotes] = useState("");
-  const [sDate, setSDate] = useState(todayIso());
+  const [sDate, setSDate] = useState(today);
+  useEffect(() => { setSDate(today); }, [today]);
   const addSpend = async () => {
     if (!active || !sAmount) return;
     const { error } = await supabase.from("spending_entries").insert({
       household_id: active.id, amount: Number(sAmount), member_id: sMember || null,
-      category: sCategory as any, notes: sNotes || null, spent_at: sDate,
-    });
+      category: sCategory as any, notes: sNotes || null,
+      spent_at: sDate, spent_local_date: sDate, user_timezone: tz,
+    } as any);
     if (error) return toast.error(error.message);
     setSAmount(""); setSNotes(""); setOpenSpend(false); loadAll();
     toast.success("Spending logged");
@@ -100,14 +109,12 @@ function BudgetPage() {
     loadAll();
   };
 
-  // ----- Date windows -----
-  const today = todayIso();
-  const weekStart = startOfWeekIso();
-  const monthStart = startOfMonthIso();
+  // Use spent_local_date when available, fallback to spent_at
+  const localDate = (s: Spending) => s.spent_local_date || s.spent_at;
 
   const sumWindow = (start: string, memberFilter?: string | null) =>
     spending
-      .filter((s) => s.spent_at >= start && s.spent_at <= today)
+      .filter((s) => localDate(s) >= start && localDate(s) <= today)
       .filter((s) => memberFilter === undefined ? true : s.member_id === memberFilter)
       .reduce((sum, x) => sum + x.amount, 0);
 
