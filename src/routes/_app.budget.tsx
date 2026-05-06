@@ -32,16 +32,7 @@ interface Budget {
 interface Spending {
   id: string; member_id: string | null; amount: number; category: string;
   payment_method: string | null; notes: string | null; spent_at: string;
-}
-
-function todayIso() { return new Date().toISOString().slice(0, 10); }
-function startOfWeekIso() {
-  const d = new Date(); const day = d.getDay(); // 0 Sun
-  const diff = (day + 6) % 7; // start Monday
-  d.setDate(d.getDate() - diff); return d.toISOString().slice(0, 10);
-}
-function startOfMonthIso() {
-  const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+  spent_local_date?: string | null;
 }
 
 function BudgetPage() {
