@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Progress } from "@/components/ui/progress";
 import { fmtMoney, fmtMoneyExact, SPENDING_CATEGORIES } from "@/lib/finance";
 import { toast } from "sonner";
+import { Plus, Trash2, Sparkles, Flame, TrendingDown, TrendingUp } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { useProfile } from "@/lib/profile-context";
 import { todayInTz, startOfWeekInTz, startOfMonthInTz } from "@/lib/tz";
