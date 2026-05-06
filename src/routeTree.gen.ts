@@ -19,6 +19,7 @@ import { Route as AppReportsRouteImport } from './routes/_app.reports'
 import { Route as AppMonthlyRouteImport } from './routes/_app.monthly'
 import { Route as AppMembersRouteImport } from './routes/_app.members'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppConnectedRouteImport } from './routes/_app.connected'
 import { Route as AppBudgetRouteImport } from './routes/_app.budget'
 import { Route as AppAnalyticsRouteImport } from './routes/_app.analytics'
 import { Route as AppAccountsRouteImport } from './routes/_app.accounts'
@@ -72,6 +73,11 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
+const AppConnectedRoute = AppConnectedRouteImport.update({
+  id: '/connected',
+  path: '/connected',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppBudgetRoute = AppBudgetRouteImport.update({
   id: '/budget',
   path: '/budget',
@@ -95,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/accounts': typeof AppAccountsRoute
   '/analytics': typeof AppAnalyticsRoute
   '/budget': typeof AppBudgetRoute
+  '/connected': typeof AppConnectedRoute
   '/dashboard': typeof AppDashboardRoute
   '/members': typeof AppMembersRoute
   '/monthly': typeof AppMonthlyRoute
@@ -109,6 +116,7 @@ export interface FileRoutesByTo {
   '/accounts': typeof AppAccountsRoute
   '/analytics': typeof AppAnalyticsRoute
   '/budget': typeof AppBudgetRoute
+  '/connected': typeof AppConnectedRoute
   '/dashboard': typeof AppDashboardRoute
   '/members': typeof AppMembersRoute
   '/monthly': typeof AppMonthlyRoute
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   '/_app/accounts': typeof AppAccountsRoute
   '/_app/analytics': typeof AppAnalyticsRoute
   '/_app/budget': typeof AppBudgetRoute
+  '/_app/connected': typeof AppConnectedRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/members': typeof AppMembersRoute
   '/_app/monthly': typeof AppMonthlyRoute
@@ -141,6 +150,7 @@ export interface FileRouteTypes {
     | '/accounts'
     | '/analytics'
     | '/budget'
+    | '/connected'
     | '/dashboard'
     | '/members'
     | '/monthly'
@@ -155,6 +165,7 @@ export interface FileRouteTypes {
     | '/accounts'
     | '/analytics'
     | '/budget'
+    | '/connected'
     | '/dashboard'
     | '/members'
     | '/monthly'
@@ -170,6 +181,7 @@ export interface FileRouteTypes {
     | '/_app/accounts'
     | '/_app/analytics'
     | '/_app/budget'
+    | '/_app/connected'
     | '/_app/dashboard'
     | '/_app/members'
     | '/_app/monthly'
@@ -257,6 +269,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/connected': {
+      id: '/_app/connected'
+      path: '/connected'
+      fullPath: '/connected'
+      preLoaderRoute: typeof AppConnectedRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/budget': {
       id: '/_app/budget'
       path: '/budget'
@@ -285,6 +304,7 @@ interface AppRouteChildren {
   AppAccountsRoute: typeof AppAccountsRoute
   AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppBudgetRoute: typeof AppBudgetRoute
+  AppConnectedRoute: typeof AppConnectedRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppMembersRoute: typeof AppMembersRoute
   AppMonthlyRoute: typeof AppMonthlyRoute
@@ -297,6 +317,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAccountsRoute: AppAccountsRoute,
   AppAnalyticsRoute: AppAnalyticsRoute,
   AppBudgetRoute: AppBudgetRoute,
+  AppConnectedRoute: AppConnectedRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppMembersRoute: AppMembersRoute,
   AppMonthlyRoute: AppMonthlyRoute,
