@@ -14,6 +14,9 @@ import { fmtMoney, fmtMoneyExact, SPENDING_CATEGORIES } from "@/lib/finance";
 import { toast } from "sonner";
 import { Plus, Trash2, Sparkles, Flame, TrendingDown, TrendingUp } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
+import { useProfile } from "@/lib/profile-context";
+import { todayInTz, startOfWeekInTz, startOfMonthInTz } from "@/lib/tz";
+
 
 export const Route = createFileRoute("/_app/budget")({
   component: () => (<RequireHousehold><BudgetPage /></RequireHousehold>),
@@ -29,21 +32,19 @@ interface Budget {
 interface Spending {
   id: string; member_id: string | null; amount: number; category: string;
   payment_method: string | null; notes: string | null; spent_at: string;
-}
-
-function todayIso() { return new Date().toISOString().slice(0, 10); }
-function startOfWeekIso() {
-  const d = new Date(); const day = d.getDay(); // 0 Sun
-  const diff = (day + 6) % 7; // start Monday
-  d.setDate(d.getDate() - diff); return d.toISOString().slice(0, 10);
-}
-function startOfMonthIso() {
-  const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+  spent_local_date?: string | null;
 }
 
 function BudgetPage() {
   const { active } = useHousehold();
   const { data: members } = useMembers();
+  const { profile } = useProfile();
+  const tz = profile?.user_timezone || "UTC";
+  const weekStartDay = profile?.week_start || "sunday";
+  const today = todayInTz(tz);
+  const weekStart = startOfWeekInTz(tz, weekStartDay);
+  const monthStart = startOfMonthInTz(tz);
+
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [spending, setSpending] = useState<Spending[]>([]);
   const [openBudget, setOpenBudget] = useState(false);
@@ -89,13 +90,15 @@ function BudgetPage() {
   const [sMember, setSMember] = useState("");
   const [sCategory, setSCategory] = useState<string>("food");
   const [sNotes, setSNotes] = useState("");
-  const [sDate, setSDate] = useState(todayIso());
+  const [sDate, setSDate] = useState(today);
+  useEffect(() => { setSDate(today); }, [today]);
   const addSpend = async () => {
     if (!active || !sAmount) return;
     const { error } = await supabase.from("spending_entries").insert({
       household_id: active.id, amount: Number(sAmount), member_id: sMember || null,
-      category: sCategory as any, notes: sNotes || null, spent_at: sDate,
-    });
+      category: sCategory as any, notes: sNotes || null,
+      spent_at: sDate, spent_local_date: sDate, user_timezone: tz,
+    } as any);
     if (error) return toast.error(error.message);
     setSAmount(""); setSNotes(""); setOpenSpend(false); loadAll();
     toast.success("Spending logged");
@@ -106,14 +109,12 @@ function BudgetPage() {
     loadAll();
   };
 
-  // ----- Date windows -----
-  const today = todayIso();
-  const weekStart = startOfWeekIso();
-  const monthStart = startOfMonthIso();
+  // Use spent_local_date when available, fallback to spent_at
+  const localDate = (s: Spending) => s.spent_local_date || s.spent_at;
 
   const sumWindow = (start: string, memberFilter?: string | null) =>
     spending
-      .filter((s) => s.spent_at >= start && s.spent_at <= today)
+      .filter((s) => localDate(s) >= start && localDate(s) <= today)
       .filter((s) => memberFilter === undefined ? true : s.member_id === memberFilter)
       .reduce((sum, x) => sum + x.amount, 0);
 
@@ -189,7 +190,7 @@ function BudgetPage() {
     for (let i = 6; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i);
       const iso = d.toISOString().slice(0, 10);
-      const total = spending.filter((s) => s.spent_at === iso).reduce((s, x) => s + x.amount, 0);
+      const total = spending.filter((s) => localDate(s) === iso).reduce((s, x) => s + x.amount, 0);
       days.push({ day: iso.slice(5), total });
     }
     return days;
@@ -198,9 +199,10 @@ function BudgetPage() {
   // Category breakdown last 30 days
   const catBreakdown = useMemo(() => {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+    const cutoffIso = cutoff.toISOString().slice(0, 10);
     const map = new Map<string, number>();
     for (const s of spending) {
-      if (new Date(s.spent_at) < cutoff) continue;
+      if (localDate(s) < cutoffIso) continue;
       map.set(s.category, (map.get(s.category) ?? 0) + s.amount);
     }
     return Array.from(map.entries())

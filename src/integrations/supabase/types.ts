@@ -131,6 +131,111 @@ export type Database = {
           },
         ]
       }
+      connected_accounts: {
+        Row: {
+          account_id: string | null
+          available_balance: number | null
+          created_at: string
+          currency: string | null
+          current_balance: number | null
+          external_account_id: string | null
+          household_id: string
+          id: string
+          institution_id: string
+          last_synced_at: string | null
+          mask: string | null
+          name: string
+          subtype: string | null
+          type: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          available_balance?: number | null
+          created_at?: string
+          currency?: string | null
+          current_balance?: number | null
+          external_account_id?: string | null
+          household_id: string
+          id?: string
+          institution_id: string
+          last_synced_at?: string | null
+          mask?: string | null
+          name: string
+          subtype?: string | null
+          type?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          available_balance?: number | null
+          created_at?: string
+          currency?: string | null
+          current_balance?: number | null
+          external_account_id?: string | null
+          household_id?: string
+          id?: string
+          institution_id?: string
+          last_synced_at?: string | null
+          mask?: string | null
+          name?: string
+          subtype?: string | null
+          type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connected_accounts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "connected_accounts_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "connected_institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      connected_institutions: {
+        Row: {
+          access_token_ref: string | null
+          created_at: string
+          created_by: string
+          household_id: string
+          id: string
+          institution_id: string | null
+          institution_name: string
+          last_synced_at: string | null
+          provider: string
+          status: string
+        }
+        Insert: {
+          access_token_ref?: string | null
+          created_at?: string
+          created_by?: string
+          household_id: string
+          id?: string
+          institution_id?: string | null
+          institution_name: string
+          last_synced_at?: string | null
+          provider?: string
+          status?: string
+        }
+        Update: {
+          access_token_ref?: string | null
+          created_at?: string
+          created_by?: string
+          household_id?: string
+          id?: string
+          institution_id?: string | null
+          institution_name?: string
+          last_synced_at?: string | null
+          provider?: string
+          status?: string
+        }
+        Relationships: []
+      }
       household_invites: {
         Row: {
           accepted_at: string | null
@@ -245,20 +350,35 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          currency: string | null
+          date_format: string | null
           display_name: string | null
           id: string
+          theme: string | null
+          user_timezone: string | null
+          week_start: string | null
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          currency?: string | null
+          date_format?: string | null
           display_name?: string | null
           id: string
+          theme?: string | null
+          user_timezone?: string | null
+          week_start?: string | null
         }
         Update: {
           avatar_url?: string | null
           created_at?: string
+          currency?: string | null
+          date_format?: string | null
           display_name?: string | null
           id?: string
+          theme?: string | null
+          user_timezone?: string | null
+          week_start?: string | null
         }
         Relationships: []
       }
@@ -274,6 +394,8 @@ export type Database = {
           notes: string | null
           payment_method: string | null
           spent_at: string
+          spent_local_date: string | null
+          user_timezone: string | null
         }
         Insert: {
           amount: number
@@ -286,6 +408,8 @@ export type Database = {
           notes?: string | null
           payment_method?: string | null
           spent_at?: string
+          spent_local_date?: string | null
+          user_timezone?: string | null
         }
         Update: {
           amount?: number
@@ -298,6 +422,8 @@ export type Database = {
           notes?: string | null
           payment_method?: string | null
           spent_at?: string
+          spent_local_date?: string | null
+          user_timezone?: string | null
         }
         Relationships: [
           {
@@ -375,6 +501,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      is_household_member: { Args: { _household_id: string }; Returns: boolean }
       is_household_owner: { Args: { _household_id: string }; Returns: boolean }
     }
     Enums: {

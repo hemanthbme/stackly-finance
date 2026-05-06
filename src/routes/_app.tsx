@@ -2,7 +2,7 @@ import { Link, Outlet, createFileRoute, useNavigate, useRouterState, redirect } 
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, CalendarRange, Wallet, Users, BarChart3, FileBarChart,
-  PiggyBank, Settings, LogOut, Menu, X, ChevronDown, PlusCircle,
+  PiggyBank, Settings, LogOut, Menu, X, ChevronDown, PlusCircle, Plug,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useHousehold } from "@/lib/household-context";
@@ -26,6 +26,7 @@ const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/weekly", label: "Weekly Snapshot", icon: CalendarRange },
   { to: "/accounts", label: "Accounts", icon: Wallet },
+  { to: "/connected", label: "Connected", icon: Plug },
   { to: "/members", label: "Members", icon: Users },
   { to: "/budget", label: "Daily Budget", icon: PiggyBank },
   { to: "/monthly", label: "Monthly Summary", icon: BarChart3 },
