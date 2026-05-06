@@ -26,6 +26,7 @@ const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/weekly", label: "Weekly Snapshot", icon: CalendarRange },
   { to: "/accounts", label: "Accounts", icon: Wallet },
+  { to: "/connected", label: "Connected", icon: Plug },
   { to: "/members", label: "Members", icon: Users },
   { to: "/budget", label: "Daily Budget", icon: PiggyBank },
   { to: "/monthly", label: "Monthly Summary", icon: BarChart3 },
