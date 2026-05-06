@@ -190,7 +190,7 @@ function BudgetPage() {
     for (let i = 6; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i);
       const iso = d.toISOString().slice(0, 10);
-      const total = spending.filter((s) => s.spent_at === iso).reduce((s, x) => s + x.amount, 0);
+      const total = spending.filter((s) => localDate(s) === iso).reduce((s, x) => s + x.amount, 0);
       days.push({ day: iso.slice(5), total });
     }
     return days;
@@ -199,9 +199,10 @@ function BudgetPage() {
   // Category breakdown last 30 days
   const catBreakdown = useMemo(() => {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+    const cutoffIso = cutoff.toISOString().slice(0, 10);
     const map = new Map<string, number>();
     for (const s of spending) {
-      if (new Date(s.spent_at) < cutoff) continue;
+      if (localDate(s) < cutoffIso) continue;
       map.set(s.category, (map.get(s.category) ?? 0) + s.amount);
     }
     return Array.from(map.entries())
