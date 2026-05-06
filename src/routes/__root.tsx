@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { AuthProvider } from "@/lib/auth-context";
 import { HouseholdProvider } from "@/lib/household-context";
+import { ProfileProvider } from "@/lib/profile-context";
 import { Toaster } from "@/components/ui/sonner";
 
 import appCss from "../styles.css?url";
