@@ -442,6 +442,42 @@ export type Database = {
           },
         ]
       }
+      transaction_categories: {
+        Row: {
+          category_type: Database["public"]["Enums"]["txn_category_type"]
+          color: string | null
+          created_at: string
+          created_by: string
+          household_id: string
+          icon: string | null
+          id: string
+          is_active: boolean
+          name: string
+        }
+        Insert: {
+          category_type?: Database["public"]["Enums"]["txn_category_type"]
+          color?: string | null
+          created_at?: string
+          created_by?: string
+          household_id: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+        }
+        Update: {
+          category_type?: Database["public"]["Enums"]["txn_category_type"]
+          color?: string | null
+          created_at?: string
+          created_by?: string
+          household_id?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+        }
+        Relationships: []
+      }
       weekly_snapshots: {
         Row: {
           account_id: string
@@ -533,6 +569,7 @@ export type Database = {
         | "bills"
         | "travel"
         | "other"
+      txn_category_type: "expense" | "income"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -690,6 +727,7 @@ export const Constants = {
         "travel",
         "other",
       ],
+      txn_category_type: ["expense", "income"],
     },
   },
 } as const
