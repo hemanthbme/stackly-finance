@@ -10,13 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { fmtMoney, fmtMoneyExact, SPENDING_CATEGORIES } from "@/lib/finance";
 import { toast } from "sonner";
-import { Plus, Trash2, Sparkles, Flame, TrendingDown, TrendingUp } from "lucide-react";
+import { Plus, Trash2, Sparkles, Flame, TrendingDown, TrendingUp, Pencil, Save, X, Tag } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { useProfile } from "@/lib/profile-context";
 import { todayInTz, startOfWeekInTz, startOfMonthInTz } from "@/lib/tz";
-
 
 export const Route = createFileRoute("/_app/budget")({
   component: () => (<RequireHousehold><BudgetPage /></RequireHousehold>),
@@ -34,6 +34,10 @@ interface Spending {
   payment_method: string | null; notes: string | null; spent_at: string;
   spent_local_date?: string | null;
 }
+interface CustomCategory {
+  id: string; name: string; icon: string | null; color: string | null;
+  category_type: "expense" | "income"; is_active: boolean;
+}
 
 function BudgetPage() {
   const { active } = useHousehold();
@@ -47,19 +51,32 @@ function BudgetPage() {
 
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [spending, setSpending] = useState<Spending[]>([]);
+  const [categories, setCategories] = useState<CustomCategory[]>([]);
   const [openBudget, setOpenBudget] = useState(false);
   const [openSpend, setOpenSpend] = useState(false);
+  const [openCat, setOpenCat] = useState(false);
 
   const loadAll = async () => {
     if (!active) return;
-    const [b, s] = await Promise.all([
+    const [b, s, c] = await Promise.all([
       supabase.from("budgets").select("*").eq("household_id", active.id).order("created_at"),
       supabase.from("spending_entries").select("*").eq("household_id", active.id).order("spent_at", { ascending: false }),
+      supabase.from("transaction_categories" as any).select("*").eq("household_id", active.id).order("name"),
     ]);
     setBudgets((b.data ?? []).map((r: any) => ({ ...r, daily_limit: Number(r.daily_limit), period: r.period ?? "daily" })) as Budget[]);
     setSpending((s.data ?? []).map((r: any) => ({ ...r, amount: Number(r.amount) })) as Spending[]);
+    setCategories((c.data ?? []) as CustomCategory[]);
   };
   useEffect(() => { loadAll(); /* eslint-disable-next-line */ }, [active?.id]);
+
+  // ----- merged categories (built-in + custom active) -----
+  const allCategories = useMemo(() => {
+    const builtIn = SPENDING_CATEGORIES.map((c) => ({ value: c.value, label: c.label, color: null as string | null }));
+    const custom = categories.filter((c) => c.is_active && c.category_type === "expense").map((c) => ({ value: `custom:${c.id}`, label: c.name, color: c.color }));
+    return [...builtIn, ...custom];
+  }, [categories]);
+
+  const categoryLabel = (v: string) => allCategories.find((c) => c.value === v)?.label ?? v;
 
   // ----- Budget form -----
   const [bName, setBName] = useState("");
@@ -90,17 +107,24 @@ function BudgetPage() {
   const [sMember, setSMember] = useState("");
   const [sCategory, setSCategory] = useState<string>("food");
   const [sNotes, setSNotes] = useState("");
+  const [sPayment, setSPayment] = useState("");
   const [sDate, setSDate] = useState(today);
   useEffect(() => { setSDate(today); }, [today]);
   const addSpend = async () => {
     if (!active || !sAmount) return;
+    // Custom categories use the "other" enum + store real name in notes prefix
+    const isCustom = sCategory.startsWith("custom:");
+    const dbCat = isCustom ? "other" : sCategory;
+    const labelPrefix = isCustom ? `[${categoryLabel(sCategory)}]` : "";
+    const notesValue = [labelPrefix, sNotes].filter(Boolean).join(" ").trim() || null;
     const { error } = await supabase.from("spending_entries").insert({
       household_id: active.id, amount: Number(sAmount), member_id: sMember || null,
-      category: sCategory as any, notes: sNotes || null,
+      category: dbCat as any, notes: notesValue,
+      payment_method: sPayment || null,
       spent_at: sDate, spent_local_date: sDate, user_timezone: tz,
     } as any);
     if (error) return toast.error(error.message);
-    setSAmount(""); setSNotes(""); setOpenSpend(false); loadAll();
+    setSAmount(""); setSNotes(""); setSPayment(""); setOpenSpend(false); loadAll();
     toast.success("Spending logged");
   };
 
@@ -109,7 +133,58 @@ function BudgetPage() {
     loadAll();
   };
 
-  // Use spent_local_date when available, fallback to spent_at
+  // ----- Edit spending -----
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<Partial<Spending> & { payment_method?: string | null }>({});
+  const startEdit = (s: Spending) => {
+    setEditingId(s.id);
+    setEditDraft({ ...s });
+  };
+  const cancelEdit = () => { setEditingId(null); setEditDraft({}); };
+  const saveEdit = async () => {
+    if (!editingId) return;
+    const patch: any = {
+      amount: Number(editDraft.amount),
+      category: editDraft.category as any,
+      member_id: editDraft.member_id || null,
+      notes: editDraft.notes || null,
+      payment_method: editDraft.payment_method || null,
+      spent_at: editDraft.spent_at,
+      spent_local_date: editDraft.spent_at,
+      user_timezone: tz,
+    };
+    const { error } = await supabase.from("spending_entries").update(patch).eq("id", editingId);
+    if (error) return toast.error(error.message);
+    cancelEdit(); loadAll();
+    toast.success("Updated");
+  };
+
+  // ----- Custom category form -----
+  const [catName, setCatName] = useState("");
+  const [catIcon, setCatIcon] = useState("");
+  const [catColor, setCatColor] = useState("#4f46e5");
+  const [catType, setCatType] = useState<"expense" | "income">("expense");
+  const addCategory = async () => {
+    if (!active || !catName.trim()) return;
+    const { error } = await supabase.from("transaction_categories" as any).insert({
+      household_id: active.id, name: catName.trim(), icon: catIcon || null,
+      color: catColor, category_type: catType, is_active: true,
+    } as any);
+    if (error) return toast.error(error.message);
+    setCatName(""); setCatIcon(""); setOpenCat(false); loadAll();
+    toast.success("Category added");
+  };
+  const toggleCategory = async (c: CustomCategory) => {
+    await supabase.from("transaction_categories" as any).update({ is_active: !c.is_active } as any).eq("id", c.id);
+    loadAll();
+  };
+  const deleteCategory = async (id: string) => {
+    if (!confirm("Delete this category?")) return;
+    await supabase.from("transaction_categories" as any).delete().eq("id", id);
+    loadAll();
+  };
+
+  // ----- Aggregations -----
   const localDate = (s: Spending) => s.spent_local_date || s.spent_at;
 
   const sumWindow = (start: string, memberFilter?: string | null) =>
@@ -122,7 +197,6 @@ function BudgetPage() {
   const totalWeek = sumWindow(weekStart);
   const totalMonth = sumWindow(monthStart);
 
-  // Find combined budgets per period
   const combinedDaily = budgets.find((b) => b.budget_type === "combined" && b.period === "daily" && b.is_active);
   const combinedWeekly = budgets.find((b) => b.budget_type === "combined" && b.period === "weekly" && b.is_active);
   const combinedMonthly = budgets.find((b) => b.budget_type === "combined" && b.period === "monthly" && b.is_active);
@@ -131,7 +205,6 @@ function BudgetPage() {
   const individualBudgets = budgets.filter((b) => b.budget_type === "individual" && b.is_active);
   const hasIndividual = individualBudgets.length > 0;
 
-  // Mode for card visibility
   const mode: "combined" | "individual" | "both" | "none" =
     hasCombined && hasIndividual ? "both" :
     hasCombined ? "combined" :
@@ -140,7 +213,6 @@ function BudgetPage() {
   const showCombinedCards = mode === "combined" || mode === "both" || mode === "none";
   const showIndividualCards = mode === "individual" || mode === "both";
 
-  // Per period daily-equivalent budgets
   const dailyLimit = combinedDaily?.daily_limit ?? 0;
   const weeklyLimit = combinedWeekly?.daily_limit ?? 0;
   const monthlyLimit = combinedMonthly?.daily_limit ?? 0;
@@ -159,10 +231,55 @@ function BudgetPage() {
   const wCard = cardData("This week", totalWeek, weeklyLimit);
   const mCard = cardData("This month", totalMonth, monthlyLimit);
 
-  // Status banner
+  // ----- Monthly projection -----
+  const projection = useMemo(() => {
+    const [yy, mm] = monthStart.split("-").map(Number);
+    const daysInMonth = new Date(yy, mm, 0).getDate();
+    const [, , dd] = today.split("-").map(Number);
+    const daysElapsed = Math.max(1, dd);
+    const avgDaily = totalMonth / daysElapsed;
+    const projectedSpend = avgDaily * daysInMonth;
+    const projectedResult = monthlyLimit - projectedSpend;
+    const daysRemaining = daysInMonth - dd;
+    return {
+      daysInMonth, daysElapsed, daysRemaining,
+      avgDaily, projectedSpend, projectedResult,
+      onTrack: monthlyLimit > 0 ? projectedResult >= 0 : null,
+    };
+  }, [monthStart, today, totalMonth, monthlyLimit]);
+
+  // Projection chart data (full month)
+  const projectionChart = useMemo(() => {
+    const [yy, mm] = monthStart.split("-").map(Number);
+    const daysInMonth = new Date(yy, mm, 0).getDate();
+    // cumulative actual per day
+    const days: { day: number; date: string; actual: number | null; projected: number | null; budget: number | null }[] = [];
+    let runTotal = 0;
+    const [, , td] = today.split("-").map(Number);
+    for (let i = 1; i <= daysInMonth; i++) {
+      const iso = `${yy}-${String(mm).padStart(2, "0")}-${String(i).padStart(2, "0")}`;
+      const dayTotal = spending.filter((s) => localDate(s) === iso).reduce((s, x) => s + x.amount, 0);
+      runTotal += dayTotal;
+      const isPast = i <= td;
+      days.push({
+        day: i, date: iso,
+        actual: isPast ? runTotal : null,
+        projected: projection.avgDaily * i,
+        budget: monthlyLimit ? (monthlyLimit / daysInMonth) * i : null,
+      });
+    }
+    return days;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spending, monthStart, today, monthlyLimit, projection.avgDaily]);
+
+  const chartMax = Math.max(
+    monthlyLimit,
+    ...projectionChart.map((p) => Math.max(p.actual ?? 0, p.projected ?? 0))
+  ) || 1;
+
+  // ----- Status -----
   const status = useMemo(() => {
     if (!hasCombined && !hasIndividual) return { msg: "Set a budget to start tracking.", tone: "default" as const, emoji: "✨" };
-    // Pick worst-offending period
     const cards = [dCard, wCard, mCard].filter((c) => c.limit > 0);
     if (cards.length === 0) return { msg: "Add a daily, weekly, or monthly limit.", tone: "default" as const, emoji: "✨" };
     const over = cards.find((c) => c.remaining < 0);
@@ -173,7 +290,6 @@ function BudgetPage() {
     return { msg: `You saved ${fmtMoney(best.remaining)} ${best.label.toLowerCase()} so far!`, tone: "success" as const, emoji: "💸" };
   }, [hasCombined, hasIndividual, dCard, wCard, mCard]);
 
-  // Per-member today (only when individual or both mode)
   const perMember = members.map((m) => {
     const ib = individualBudgets.find((b) => b.member_id === m.id);
     const limit = ib?.daily_limit ?? 0;
@@ -184,19 +300,19 @@ function BudgetPage() {
     return { member: m, limit, period, spent, remaining, hasBudget: !!ib };
   }).filter(() => showIndividualCards);
 
-  // Trends
-  const last7 = useMemo(() => {
-    const days: { day: string; total: number }[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(); d.setDate(d.getDate() - i);
-      const iso = d.toISOString().slice(0, 10);
+  // Daily totals across the WHOLE current month
+  const monthDaily = useMemo(() => {
+    const [yy, mm] = monthStart.split("-").map(Number);
+    const daysInMonth = new Date(yy, mm, 0).getDate();
+    const arr: { iso: string; label: string; total: number }[] = [];
+    for (let i = 1; i <= daysInMonth; i++) {
+      const iso = `${yy}-${String(mm).padStart(2, "0")}-${String(i).padStart(2, "0")}`;
       const total = spending.filter((s) => localDate(s) === iso).reduce((s, x) => s + x.amount, 0);
-      days.push({ day: iso.slice(5), total });
+      arr.push({ iso, label: iso.slice(5), total });
     }
-    return days;
-  }, [spending]);
+    return arr;
+  }, [spending, monthStart]);
 
-  // Category breakdown last 30 days
   const catBreakdown = useMemo(() => {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
     const cutoffIso = cutoff.toISOString().slice(0, 10);
@@ -218,7 +334,31 @@ function BudgetPage() {
           <h1 className="font-display text-3xl font-bold">Daily Budget</h1>
           <p className="text-sm text-muted-foreground">Stay on track day · week · month.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Dialog open={openCat} onOpenChange={setOpenCat}>
+            <DialogTrigger asChild><Button variant="outline"><Tag className="mr-1 h-4 w-4" />Category</Button></DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>New category</DialogTitle></DialogHeader>
+              <div className="grid gap-3">
+                <div className="space-y-1.5"><Label>Name</Label><Input value={catName} onChange={(e) => setCatName(e.target.value)} placeholder="e.g. Subscriptions" /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5"><Label>Icon (emoji)</Label><Input value={catIcon} onChange={(e) => setCatIcon(e.target.value)} placeholder="🎬" maxLength={4} /></div>
+                  <div className="space-y-1.5"><Label>Color</Label><Input type="color" value={catColor} onChange={(e) => setCatColor(e.target.value)} /></div>
+                </div>
+                <div className="space-y-1.5"><Label>Type</Label>
+                  <Select value={catType} onValueChange={(v) => setCatType(v as any)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="expense">Expense</SelectItem>
+                      <SelectItem value="income">Income</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter><Button onClick={addCategory} className="bg-gradient-primary">Create</Button></DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={openBudget} onOpenChange={setOpenBudget}>
             <DialogTrigger asChild><Button variant="outline"><Plus className="mr-1 h-4 w-4" />Budget</Button></DialogTrigger>
             <DialogContent>
@@ -282,11 +422,14 @@ function BudgetPage() {
                   <div className="space-y-1.5"><Label>Category</Label>
                     <Select value={sCategory} onValueChange={setSCategory}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{SPENDING_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                      <SelectContent>{allCategories.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                 </div>
-                <div className="space-y-1.5"><Label>Notes</Label><Input value={sNotes} onChange={(e) => setSNotes(e.target.value)} placeholder="optional" /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5"><Label>Payment method</Label><Input value={sPayment} onChange={(e) => setSPayment(e.target.value)} placeholder="Card, cash..." /></div>
+                  <div className="space-y-1.5"><Label>Notes</Label><Input value={sNotes} onChange={(e) => setSNotes(e.target.value)} placeholder="optional" /></div>
+                </div>
               </div>
               <DialogFooter><Button onClick={addSpend} className="bg-gradient-primary">Add</Button></DialogFooter>
             </DialogContent>
@@ -304,125 +447,259 @@ function BudgetPage() {
         <div className="font-medium">{status.msg}</div>
       </div>
 
-      {/* Combined period stats */}
-      {showCombinedCards && (
-        <>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Spent today" value={fmtMoney(totalToday)} icon={<Flame className="h-4 w-4 text-warning" />} />
-            <PeriodCard data={dCard} />
-            <StatCard label="Spent this week" value={fmtMoney(totalWeek)} />
-            <PeriodCard data={wCard} />
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Spent this month" value={fmtMoney(totalMonth)} />
-            <PeriodCard data={mCard} />
-            <StatCard
-              label="Budget health"
-              value={
-                status.tone === "success" ? "Healthy" :
-                status.tone === "warning" ? "Watch out" :
-                status.tone === "destructive" ? "Over budget" : "Set a budget"
-              }
-              tone={status.tone === "default" ? "default" : status.tone}
-            />
-            <StatCard label="Last 7 days" value={fmtMoney(last7.reduce((s, d) => s + d.total, 0))} />
-          </div>
+      <Tabs defaultValue="overview">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="health">Health</TabsTrigger>
+          <TabsTrigger value="month">Month view</TabsTrigger>
+          <TabsTrigger value="categories">Categories</TabsTrigger>
+        </TabsList>
 
-          {/* Health bars */}
-          {(dailyLimit || weeklyLimit || monthlyLimit) > 0 && (
-            <div className="grid gap-4 md:grid-cols-3">
-              {dailyLimit > 0 && <HealthBar title="Daily" data={dCard} />}
-              {weeklyLimit > 0 && <HealthBar title="Weekly" data={wCard} />}
-              {monthlyLimit > 0 && <HealthBar title="Monthly" data={mCard} />}
-            </div>
-          )}
-        </>
-      )}
+        {/* OVERVIEW */}
+        <TabsContent value="overview" className="space-y-6">
+          {showCombinedCards && (
+            <>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <StatCard label="Spent today" value={fmtMoney(totalToday)} icon={<Flame className="h-4 w-4 text-warning" />} />
+                <PeriodCard data={dCard} />
+                <StatCard label="Spent this week" value={fmtMoney(totalWeek)} />
+                <PeriodCard data={wCard} />
+              </div>
 
-      {/* Per-member */}
-      {showIndividualCards && perMember.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {perMember.map(({ member, limit, period, spent, remaining, hasBudget }) => {
-            const pct = limit ? Math.min(100, (spent / limit) * 100) : 0;
-            const tone = !limit ? "default" : remaining < 0 ? "destructive" : pct >= 80 ? "warning" : "success";
-            return (
-              <div key={member.id} className="rounded-2xl border border-border bg-card p-5 shadow-card">
-                <div className="flex items-center gap-3">
-                  <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-primary font-display font-bold">{member.name[0]?.toUpperCase()}</div>
-                  <div className="flex-1">
-                    <div className="text-xs uppercase tracking-wider text-muted-foreground">{member.name} · {period}</div>
-                    <div className="font-display text-xl font-bold">{fmtMoney(spent)}{hasBudget && <span className="ml-1 text-xs font-normal text-muted-foreground">of {fmtMoney(limit)}</span>}</div>
+              {/* Combined month spend display */}
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <div className="font-display text-xl font-bold">
+                    {fmtMoney(totalMonth)} <span className="text-muted-foreground">of {monthlyLimit ? fmtMoney(monthlyLimit) : "—"} spent this month</span>
                   </div>
-                </div>
-                {hasBudget && (
-                  <>
-                    <Progress value={pct} className="mt-3" />
-                    <div className={`mt-2 inline-flex items-center gap-1 text-xs font-medium ${
-                      tone === "success" ? "text-success" : tone === "warning" ? "text-warning" : tone === "destructive" ? "text-destructive" : "text-muted-foreground"
-                    }`}>
-                      {remaining >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                      {remaining >= 0 ? `${fmtMoney(remaining)} left` : `Over by ${fmtMoney(Math.abs(remaining))}`}
+                  {monthlyLimit > 0 && (
+                    <div className="text-sm text-muted-foreground">
+                      {Math.round(mCard.pct)}% used · {mCard.remaining >= 0 ? `${fmtMoney(mCard.remaining)} left` : `${fmtMoney(Math.abs(mCard.remaining))} over`}
                     </div>
-                  </>
+                  )}
+                </div>
+                {monthlyLimit > 0 && (
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+                    <div className={`h-full transition-all ${mCard.tone === "destructive" ? "bg-destructive" : mCard.tone === "warning" ? "bg-warning" : "bg-success"}`} style={{ width: `${Math.min(100, mCard.pct)}%` }} />
+                  </div>
                 )}
               </div>
-            );
-          })}
-        </div>
-      )}
+            </>
+          )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
-          <h3 className="font-display text-lg font-semibold">Last 7 days</h3>
-          <div className="mt-4 space-y-2">
-            {last7.map((d) => (
-              <div key={d.day} className="flex items-center gap-3">
-                <div className="w-12 text-xs text-muted-foreground">{d.day}</div>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full bg-gradient-primary transition-all" style={{ width: `${Math.min(100, dailyLimit ? (d.total / dailyLimit) * 100 : (d.total / Math.max(1, Math.max(...last7.map((x) => x.total)))) * 100)}%` }} />
+          {/* Per-member */}
+          {showIndividualCards && perMember.length > 0 && (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {perMember.map(({ member, limit, period, spent, remaining, hasBudget }) => {
+                const pct = limit ? Math.min(100, (spent / limit) * 100) : 0;
+                const tone = !limit ? "default" : remaining < 0 ? "destructive" : pct >= 80 ? "warning" : "success";
+                return (
+                  <div key={member.id} className="rounded-2xl border border-border bg-card p-5 shadow-card">
+                    <div className="flex items-center gap-3">
+                      <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-primary font-display font-bold">{member.name[0]?.toUpperCase()}</div>
+                      <div className="flex-1">
+                        <div className="text-xs uppercase tracking-wider text-muted-foreground">{member.name} · {period}</div>
+                        <div className="font-display text-xl font-bold">{fmtMoney(spent)}{hasBudget && <span className="ml-1 text-xs font-normal text-muted-foreground">of {fmtMoney(limit)}</span>}</div>
+                      </div>
+                    </div>
+                    {hasBudget && (
+                      <>
+                        <Progress value={pct} className="mt-3" />
+                        <div className={`mt-2 inline-flex items-center gap-1 text-xs font-medium ${
+                          tone === "success" ? "text-success" : tone === "warning" ? "text-warning" : tone === "destructive" ? "text-destructive" : "text-muted-foreground"
+                        }`}>
+                          {remaining >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                          {remaining >= 0 ? `${fmtMoney(remaining)} left` : `Over by ${fmtMoney(Math.abs(remaining))}`}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Category breakdown */}
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
+            <h3 className="font-display text-lg font-semibold">By category (30d)</h3>
+            <div className="mt-4 space-y-2">
+              {catBreakdown.length === 0 && <div className="py-6 text-center text-sm text-muted-foreground">Nothing logged yet.</div>}
+              {catBreakdown.map((c) => (
+                <div key={c.key} className="flex items-center gap-3">
+                  <div className="w-28 truncate text-xs text-muted-foreground">{c.label}</div>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full bg-gradient-primary transition-all" style={{ width: `${(c.value / catMax) * 100}%` }} />
+                  </div>
+                  <div className="w-20 text-right text-sm font-medium">{fmtMoney(c.value)}</div>
                 </div>
-                <div className="w-20 text-right text-sm font-medium">{fmtMoney(d.total)}</div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
-          <h3 className="font-display text-lg font-semibold">By category (30d)</h3>
-          <div className="mt-4 space-y-2">
-            {catBreakdown.length === 0 && <div className="py-6 text-center text-sm text-muted-foreground">Nothing logged yet.</div>}
-            {catBreakdown.map((c) => (
-              <div key={c.key} className="flex items-center gap-3">
-                <div className="w-28 truncate text-xs text-muted-foreground">{c.label}</div>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full bg-gradient-primary transition-all" style={{ width: `${(c.value / catMax) * 100}%` }} />
-                </div>
-                <div className="w-20 text-right text-sm font-medium">{fmtMoney(c.value)}</div>
-              </div>
-            ))}
+          {/* Recent spending with edit */}
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
+            <h3 className="font-display text-lg font-semibold">Recent spending</h3>
+            <div className="mt-3 max-h-[28rem] space-y-2 overflow-auto">
+              {spending.slice(0, 50).map((s) => {
+                const isEdit = editingId === s.id;
+                const cat = SPENDING_CATEGORIES.find((c) => c.value === s.category)?.label ?? s.category;
+                const m = members.find((m) => m.id === s.member_id);
+                if (isEdit) {
+                  return (
+                    <div key={s.id} className="rounded-lg border border-primary/40 bg-muted/30 p-3">
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        <div className="space-y-1"><Label className="text-xs">Amount</Label>
+                          <Input inputMode="decimal" value={String(editDraft.amount ?? "")} onChange={(e) => setEditDraft({ ...editDraft, amount: Number(e.target.value) })} />
+                        </div>
+                        <div className="space-y-1"><Label className="text-xs">Date</Label>
+                          <Input type="date" value={(editDraft.spent_at as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, spent_at: e.target.value })} />
+                        </div>
+                        <div className="space-y-1"><Label className="text-xs">Category</Label>
+                          <Select value={(editDraft.category as string) ?? "other"} onValueChange={(v) => setEditDraft({ ...editDraft, category: v })}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>{SPENDING_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1"><Label className="text-xs">Member</Label>
+                          <Select value={(editDraft.member_id as string) || "none"} onValueChange={(v) => setEditDraft({ ...editDraft, member_id: v === "none" ? null : v })}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Household</SelectItem>
+                              {members.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1"><Label className="text-xs">Payment</Label>
+                          <Input value={(editDraft.payment_method as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, payment_method: e.target.value })} />
+                        </div>
+                        <div className="space-y-1"><Label className="text-xs">Notes</Label>
+                          <Input value={(editDraft.notes as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, notes: e.target.value })} />
+                        </div>
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <Button size="sm" onClick={saveEdit} className="bg-gradient-primary"><Save className="mr-1 h-3 w-3" />Save</Button>
+                        <Button size="sm" variant="ghost" onClick={cancelEdit}><X className="mr-1 h-3 w-3" />Cancel</Button>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={s.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
+                    <div>
+                      <div className="text-sm font-medium">{fmtMoneyExact(s.amount)} <span className="text-xs text-muted-foreground">· {cat}</span></div>
+                      <div className="text-xs text-muted-foreground">{s.spent_at} · {m?.name ?? "Household"}{s.payment_method ? ` · ${s.payment_method}` : ""}{s.notes ? ` · ${s.notes}` : ""}</div>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => startEdit(s)}><Pencil className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => removeSpend(s.id)}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
+                  </div>
+                );
+              })}
+              {spending.length === 0 && <div className="py-6 text-center text-sm text-muted-foreground">No spending yet. <Sparkles className="ml-1 inline h-3 w-3" /></div>}
+            </div>
           </div>
-        </div>
-      </div>
+        </TabsContent>
 
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
-        <h3 className="font-display text-lg font-semibold">Recent spending</h3>
-        <div className="mt-3 max-h-80 space-y-2 overflow-auto">
-          {spending.slice(0, 30).map((s) => {
-            const cat = SPENDING_CATEGORIES.find((c) => c.value === s.category)?.label ?? s.category;
-            const m = members.find((m) => m.id === s.member_id);
-            return (
-              <div key={s.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
-                <div>
-                  <div className="text-sm font-medium">{fmtMoneyExact(s.amount)} <span className="text-xs text-muted-foreground">· {cat}</span></div>
-                  <div className="text-xs text-muted-foreground">{s.spent_at} · {m?.name ?? "Household"}{s.notes ? ` · ${s.notes}` : ""}</div>
-                </div>
-                <Button variant="ghost" size="icon" onClick={() => removeSpend(s.id)}><Trash2 className="h-4 w-4" /></Button>
+        {/* HEALTH */}
+        <TabsContent value="health" className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-3">
+            <HealthCard title="Daily" data={dCard} />
+            <HealthCard title="Weekly" data={wCard} />
+            <HealthCard title="Monthly" data={mCard} />
+          </div>
+
+          {/* Projection card */}
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-lg font-semibold">Month-end projection</h3>
+              <span className="text-xs text-muted-foreground">Day {projection.daysElapsed} of {projection.daysInMonth}</span>
+            </div>
+            {monthlyLimit > 0 ? (
+              <div className="mt-3 grid gap-4 md:grid-cols-3">
+                <Stat label="Avg / day so far" value={fmtMoney(projection.avgDaily)} />
+                <Stat label="Projected spend" value={fmtMoney(projection.projectedSpend)} />
+                <Stat
+                  label={projection.onTrack ? "Projected remaining" : "Projected overspend"}
+                  value={fmtMoney(Math.abs(projection.projectedResult))}
+                  tone={projection.onTrack ? "success" : "destructive"}
+                />
               </div>
-            );
-          })}
-          {spending.length === 0 && <div className="py-6 text-center text-sm text-muted-foreground">No spending yet. <Sparkles className="ml-1 inline h-3 w-3" /></div>}
-        </div>
-      </div>
+            ) : (
+              <div className="mt-3 text-sm text-muted-foreground">Set a monthly budget to see your projection.</div>
+            )}
+
+            {/* Projection chart */}
+            {monthlyLimit > 0 && (
+              <ProjectionChart days={projectionChart} max={chartMax} monthlyLimit={monthlyLimit} />
+            )}
+          </div>
+
+          {/* Messages */}
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
+            <h3 className="font-display text-lg font-semibold">Status</h3>
+            <ul className="mt-3 space-y-2 text-sm">
+              <li>{dCard.limit ? (dCard.remaining < 0 ? `🚨 Over your daily limit by ${fmtMoney(Math.abs(dCard.remaining))}.` : dCard.pct >= 80 ? `⚠️ Close to your daily limit (${Math.round(dCard.pct)}%).` : `✅ On track today — ${fmtMoney(dCard.remaining)} left.`) : "No daily limit set."}</li>
+              <li>{wCard.limit ? (wCard.remaining < 0 ? `🚨 Over your weekly limit by ${fmtMoney(Math.abs(wCard.remaining))}.` : wCard.pct >= 80 ? `⚠️ You are close to your weekly limit.` : `✅ Comfortable this week — ${fmtMoney(wCard.remaining)} left.`) : "No weekly limit set."}</li>
+              <li>{monthlyLimit ? (projection.onTrack ? `✅ At this pace, you will end the month with ${fmtMoney(projection.projectedResult)} unspent.` : `🚨 At this pace, you may overspend by ${fmtMoney(Math.abs(projection.projectedResult))} this month.`) : "No monthly limit set."}</li>
+            </ul>
+          </div>
+        </TabsContent>
+
+        {/* MONTH VIEW */}
+        <TabsContent value="month">
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-lg font-semibold">This month — daily spend</h3>
+              <span className="text-xs text-muted-foreground">Scroll to see all {monthDaily.length} days</span>
+            </div>
+            <div className="mt-4 max-h-[24rem] space-y-2 overflow-auto pr-2">
+              {monthDaily.map((d) => {
+                const over = dailyLimit > 0 && d.total > dailyLimit;
+                const pct = dailyLimit ? Math.min(100, (d.total / dailyLimit) * 100) : (d.total / Math.max(1, Math.max(...monthDaily.map((x) => x.total)))) * 100;
+                const isToday = d.iso === today;
+                return (
+                  <div key={d.iso} className={`flex items-center gap-3 rounded-lg px-2 py-1.5 ${isToday ? "bg-primary/10" : ""}`}>
+                    <div className="w-14 text-xs text-muted-foreground">{d.label}{isToday && " ·"}</div>
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                      <div className={`h-full transition-all ${over ? "bg-destructive" : "bg-gradient-primary"}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <div className={`w-20 text-right text-sm font-medium ${over ? "text-destructive" : ""}`}>{fmtMoney(d.total)}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* CATEGORIES */}
+        <TabsContent value="categories">
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-lg font-semibold">Custom categories</h3>
+              <Button size="sm" variant="outline" onClick={() => setOpenCat(true)}><Plus className="mr-1 h-3 w-3" />Add</Button>
+            </div>
+            <div className="mt-4 space-y-2">
+              {categories.length === 0 && <div className="py-6 text-center text-sm text-muted-foreground">No custom categories yet.</div>}
+              {categories.map((c) => (
+                <div key={c.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-8 w-8 place-items-center rounded-full text-sm" style={{ background: c.color ?? "#4f46e5" }}>{c.icon ?? "•"}</div>
+                    <div>
+                      <div className="text-sm font-medium">{c.name}</div>
+                      <div className="text-xs text-muted-foreground">{c.category_type} · {c.is_active ? "active" : "inactive"}</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => toggleCategory(c)}>{c.is_active ? "Disable" : "Enable"}</Button>
+                    <Button size="sm" variant="ghost" onClick={() => deleteCategory(c.id)}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
@@ -440,20 +717,72 @@ function PeriodCard({ data }: { data: CardData }) {
   );
 }
 
-function HealthBar({ title, data }: { title: string; data: CardData }) {
+function HealthCard({ title, data }: { title: string; data: CardData }) {
   const color = data.tone === "destructive" ? "bg-destructive" : data.tone === "warning" ? "bg-warning" : "bg-success";
+  const status = !data.limit ? "No limit" : data.remaining < 0 ? "Over budget" : data.pct >= 80 ? "Close to limit" : "Under budget";
+  const toneText = data.tone === "destructive" ? "text-destructive" : data.tone === "warning" ? "text-warning" : data.tone === "success" ? "text-success" : "text-muted-foreground";
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
-      <div className="flex justify-between text-sm">
-        <span>{title} health</span>
-        <span className="font-medium">{Math.round(data.pct)}%</span>
+      <div className="flex items-center justify-between">
+        <h4 className="font-display text-lg font-semibold">{title}</h4>
+        <span className={`text-xs font-medium ${toneText}`}>{status}</span>
       </div>
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+      <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+        <div><div className="text-muted-foreground">Budget</div><div className="font-medium">{data.limit ? fmtMoney(data.limit) : "—"}</div></div>
+        <div><div className="text-muted-foreground">Spent</div><div className="font-medium">{fmtMoney(data.spent)}</div></div>
+        <div><div className="text-muted-foreground">Left</div><div className={`font-medium ${data.remaining < 0 ? "text-destructive" : ""}`}>{data.limit ? fmtMoney(data.remaining) : "—"}</div></div>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
         <div className={`h-full transition-all ${color}`} style={{ width: `${Math.min(100, data.pct)}%` }} />
       </div>
-      <div className="mt-2 text-xs text-muted-foreground">
-        {fmtMoney(data.spent)} of {fmtMoney(data.limit)} · {data.remaining >= 0 ? `${fmtMoney(data.remaining)} left` : `Over by ${fmtMoney(Math.abs(data.remaining))}`}
-      </div>
+      <div className="mt-1 text-right text-xs text-muted-foreground">{Math.round(data.pct)}% used</div>
+    </div>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: string; tone?: "success" | "destructive" }) {
+  const t = tone === "success" ? "text-success" : tone === "destructive" ? "text-destructive" : "text-foreground";
+  return (
+    <div className="rounded-xl border border-border bg-muted/20 p-3">
+      <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className={`mt-1 font-display text-xl font-bold ${t}`}>{value}</div>
+    </div>
+  );
+}
+
+function ProjectionChart({ days, max, monthlyLimit }: { days: { day: number; actual: number | null; projected: number | null; budget: number | null }[]; max: number; monthlyLimit: number }) {
+  const W = 600, H = 180, P = 24;
+  const x = (i: number) => P + (i / Math.max(1, days.length - 1)) * (W - P * 2);
+  const y = (v: number) => H - P - (v / max) * (H - P * 2);
+
+  const actualPath = days
+    .filter((d) => d.actual !== null)
+    .map((d, i) => `${i === 0 ? "M" : "L"} ${x(d.day - 1)} ${y(d.actual!)}`)
+    .join(" ");
+  const projPath = days
+    .map((d, i) => `${i === 0 ? "M" : "L"} ${x(d.day - 1)} ${y(d.projected!)}`)
+    .join(" ");
+  const budgetY = y(monthlyLimit);
+
+  return (
+    <div className="mt-5 overflow-x-auto">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 320 }}>
+        {/* budget line */}
+        <line x1={P} x2={W - P} y1={budgetY} y2={budgetY} stroke="hsl(var(--warning))" strokeDasharray="4 4" />
+        <text x={W - P} y={budgetY - 4} textAnchor="end" fontSize="10" fill="hsl(var(--warning))">Budget {fmtMoney(monthlyLimit)}</text>
+
+        {/* projected */}
+        <path d={projPath} fill="none" stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" strokeWidth="1.5" />
+        {/* actual */}
+        <path d={actualPath} fill="none" stroke="hsl(var(--primary))" strokeWidth="2.5" />
+
+        {/* legend */}
+        <g transform={`translate(${P}, ${P - 12})`} fontSize="10" fill="hsl(var(--muted-foreground))">
+          <circle cx="4" cy="4" r="3" fill="hsl(var(--primary))" /><text x="12" y="7">Actual</text>
+          <circle cx="64" cy="4" r="3" fill="hsl(var(--muted-foreground))" /><text x="72" y="7">Projected</text>
+          <circle cx="138" cy="4" r="3" fill="hsl(var(--warning))" /><text x="146" y="7">Budget</text>
+        </g>
+      </svg>
     </div>
   );
 }
