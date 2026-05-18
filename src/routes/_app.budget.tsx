@@ -65,7 +65,7 @@ function BudgetPage() {
     ]);
     setBudgets((b.data ?? []).map((r: any) => ({ ...r, daily_limit: Number(r.daily_limit), period: r.period ?? "daily" })) as Budget[]);
     setSpending((s.data ?? []).map((r: any) => ({ ...r, amount: Number(r.amount) })) as Spending[]);
-    setCategories((c.data ?? []) as CustomCategory[]);
+    setCategories(((c.data ?? []) as unknown) as CustomCategory[]);
   };
   useEffect(() => { loadAll(); /* eslint-disable-next-line */ }, [active?.id]);
 
