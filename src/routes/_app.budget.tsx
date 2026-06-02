@@ -256,21 +256,36 @@ function BudgetPage() {
   // ----- Aggregations -----
   const localDate = (s: Spending) => s.spent_local_date || s.spent_at;
 
-  const sumWindow = (start: string, memberFilter?: string | null) =>
-    spending
-      .filter((s) => localDate(s) >= start && localDate(s) <= today)
+  const variableSpending = spending.filter((s) => !isFixedEntry(s));
+  const fixedSpending = spending.filter((s) => isFixedEntry(s));
+
+  const sumWindowFiltered = (entries: typeof spending, start: string, memberFilter?: string | null) =>
+    entries
+      .filter((s) => {
+        const d = localDate(s);
+        return d >= start && d <= today;
+      })
       .filter((s) => memberFilter === undefined ? true : s.member_id === memberFilter)
       .reduce((sum, x) => sum + x.amount, 0);
 
-  const totalToday = sumWindow(today);
-  const totalWeek = sumWindow(weekStart);
-  const totalMonth = sumWindow(monthStart);
+  const sumWindow = (start: string, memberFilter?: string | null) =>
+    sumWindowFiltered(variableSpending, start, memberFilter);
+
+  const totalVariableToday = sumWindowFiltered(variableSpending, today);
+  const totalVariableWeek = sumWindowFiltered(variableSpending, weekStart);
+  const totalVariableMonth = sumWindowFiltered(variableSpending, monthStart);
+  const totalFixedToday = sumWindowFiltered(fixedSpending, today);
+  const totalFixedWeek = sumWindowFiltered(fixedSpending, weekStart);
+  const totalFixedMonth = sumWindowFiltered(fixedSpending, monthStart);
+  // Back-compat aliases (downstream projection/charts use variable totals)
+  const totalToday = totalVariableToday;
+  const totalWeek = totalVariableWeek;
+  const totalMonth = totalVariableMonth;
+  void totalFixedToday; void totalFixedWeek;
 
   const combinedDaily = budgets.find((b) => b.budget_type === "combined" && b.period === "daily" && b.is_active);
-  const combinedWeekly = budgets.find((b) => b.budget_type === "combined" && b.period === "weekly" && b.is_active);
-  const combinedMonthly = budgets.find((b) => b.budget_type === "combined" && b.period === "monthly" && b.is_active);
 
-  const hasCombined = !!(combinedDaily || combinedWeekly || combinedMonthly);
+  const hasCombined = !!combinedDaily;
   const individualBudgets = budgets.filter((b) => b.budget_type === "individual" && b.is_active);
   const hasIndividual = individualBudgets.length > 0;
 
@@ -282,9 +297,14 @@ function BudgetPage() {
   const showCombinedCards = mode === "combined" || mode === "both" || mode === "none";
   const showIndividualCards = mode === "individual" || mode === "both";
 
-  const dailyLimit = combinedDaily?.daily_limit ?? 0;
-  const weeklyLimit = combinedWeekly?.daily_limit ?? 0;
-  const monthlyLimit = combinedMonthly?.daily_limit ?? 0;
+  // Single variable daily rate — weekly and monthly roll up from this
+  const variableDailyLimit = combinedDaily?.daily_limit ?? 0;
+  const variableWeeklyLimit = variableDailyLimit * 7;
+  const variableMonthlyLimit = variableDailyLimit * 31;
+
+  const dailyLimit = variableDailyLimit;
+  const weeklyLimit = variableWeeklyLimit;
+  const monthlyLimit = variableMonthlyLimit;
 
   const cardData = (label: string, spent: number, limit: number) => {
     const remaining = limit - spent;
@@ -296,9 +316,9 @@ function BudgetPage() {
     return { label, spent, limit, remaining, pct, tone };
   };
 
-  const dCard = cardData("Today", totalToday, dailyLimit);
-  const wCard = cardData("This week", totalWeek, weeklyLimit);
-  const mCard = cardData("This month", totalMonth, monthlyLimit);
+  const dCard = cardData("Today (variable)", totalVariableToday, variableDailyLimit);
+  const wCard = cardData("This week (variable)", totalVariableWeek, variableWeeklyLimit);
+  const mCard = cardData("This month (variable)", totalVariableMonth, variableMonthlyLimit);
 
   // ----- Monthly projection -----
   const projection = useMemo(() => {
