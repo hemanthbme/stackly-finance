@@ -429,6 +429,57 @@ export type Database = {
         }
         Relationships: []
       }
+      recurring_entries: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          created_by: string
+          household_id: string
+          id: string
+          is_active: boolean
+          label: string
+          member_id: string | null
+        }
+        Insert: {
+          amount: number
+          category?: string
+          created_at?: string
+          created_by?: string
+          household_id: string
+          id?: string
+          is_active?: boolean
+          label: string
+          member_id?: string | null
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          created_by?: string
+          household_id?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          member_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_entries_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_entries_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "household_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spending_entries: {
         Row: {
           amount: number
