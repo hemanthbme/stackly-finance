@@ -68,42 +68,15 @@ function AccountsPage() {
           <DialogTrigger asChild><Button className="bg-gradient-primary"><Plus className="mr-1 h-4 w-4" />Add account</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>New account</DialogTitle></DialogHeader>
-            <div className="grid gap-3">
-              <div className="space-y-1.5"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Chase Checking" /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5"><Label>Category</Label>
-                  <Select value={category} onValueChange={(v) => setCategory(v as AccountCategory)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{CATS.map((c) => <SelectItem key={c} value={c}>{CATEGORY_LABELS[c]}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5"><Label>Owner</Label>
-                  <Select value={memberId || "none"} onValueChange={(v) => setMemberId(v === "none" ? "" : v)}>
-                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Unassigned</SelectItem>
-                      {members.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5"><Label>Ownership</Label>
-                  <Select value={ownership} onValueChange={(v) => setOwnership(v as any)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="individual">Individual</SelectItem>
-                      <SelectItem value="joint">Joint</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5"><Label>Institution</Label><Input value={institution} onChange={(e) => setInstitution(e.target.value)} placeholder="optional" /></div>
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
-                <div><Label>Include in net worth</Label><div className="text-xs text-muted-foreground">Toggle off to track without affecting totals</div></div>
-                <Switch checked={include} onCheckedChange={setInclude} />
-              </div>
-            </div>
+            <AccountFormFields
+              name={name} setName={setName}
+              category={category} setCategory={setCategory}
+              memberId={memberId} setMemberId={setMemberId}
+              ownership={ownership} setOwnership={setOwnership}
+              institution={institution} setInstitution={setInstitution}
+              include={include} setInclude={setInclude}
+              members={members}
+            />
             <DialogFooter><Button onClick={add} className="bg-gradient-primary">Add account</Button></DialogFooter>
           </DialogContent>
         </Dialog>
