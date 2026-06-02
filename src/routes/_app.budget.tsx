@@ -810,7 +810,7 @@ function BudgetPage() {
               <span className="text-xs text-muted-foreground">Day {projection.daysElapsed} of {projection.daysInMonth}</span>
             </div>
             {monthlyLimit > 0 ? (
-              <div className="mt-3 grid gap-4 md:grid-cols-3">
+              <div className="mt-3 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Stat label="Avg / day so far" value={fmtMoney(projection.avgDaily)} />
                 <Stat label="Projected spend" value={fmtMoney(projection.projectedSpend)} />
                 <Stat
@@ -818,7 +818,20 @@ function BudgetPage() {
                   value={fmtMoney(Math.abs(projection.projectedResult))}
                   tone={projection.onTrack ? "success" : "destructive"}
                 />
+                {projection.daysRemaining > 0 && (() => {
+                  const maxPerDay = (monthlyLimit - totalMonth) / projection.daysRemaining;
+                  const tone: "success" | "destructive" | undefined =
+                    maxPerDay <= 0 ? "destructive" : maxPerDay >= projection.avgDaily ? "success" : undefined;
+                  return (
+                    <Stat
+                      label="Max spend / day to stay on track"
+                      value={maxPerDay > 0 ? fmtMoney(maxPerDay) : fmtMoney(0)}
+                      tone={tone}
+                    />
+                  );
+                })()}
               </div>
+
             ) : (
               <div className="mt-3 text-sm text-muted-foreground">Set a monthly budget to see your projection.</div>
             )}
