@@ -3,9 +3,11 @@ import { useEffect, useState } from "react";
 import {
   LayoutDashboard, CalendarRange, Wallet, Users, BarChart3, FileBarChart,
   PiggyBank, Settings, LogOut, Menu, X, ChevronDown, PlusCircle, Plug, HelpCircle,
+  Sun, Moon, Monitor,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useHousehold } from "@/lib/household-context";
+import { useProfile } from "@/lib/profile-context";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
@@ -97,13 +99,31 @@ function AppShell() {
         <header className="flex h-16 items-center justify-between border-b border-border px-4 md:px-8">
           <button className="md:hidden" onClick={() => setMobileOpen(true)}><Menu className="h-5 w-5" /></button>
           <div className="flex-1" />
-          <div className="text-sm text-muted-foreground">{user.email}</div>
+          <ThemeToggle />
+          <div className="ml-3 text-sm text-muted-foreground">{user.email}</div>
         </header>
         <main className="flex-1 overflow-auto p-4 md:p-8">
           <Outlet />
         </main>
       </div>
     </div>
+  );
+}
+
+function ThemeToggle() {
+  const { profile, update } = useProfile();
+  const theme = profile?.theme ?? "system";
+  const next = theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
+  const Icon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      title={`Theme: ${theme} (click for ${next})`}
+      onClick={() => update({ theme: next })}
+    >
+      <Icon className="h-4 w-4" />
+    </Button>
   );
 }
 

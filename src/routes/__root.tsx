@@ -1,9 +1,9 @@
 import { Outlet, createRootRoute, HeadContent, Scripts, Link } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AuthProvider } from "@/lib/auth-context";
 import { HouseholdProvider } from "@/lib/household-context";
-import { ProfileProvider } from "@/lib/profile-context";
+import { ProfileProvider, useProfile } from "@/lib/profile-context";
 import { Toaster } from "@/components/ui/sonner";
 
 import appCss from "../styles.css?url";
@@ -58,12 +58,43 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+function ThemeApplier() {
+  const { profile } = useProfile();
+  const theme = profile?.theme;
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    const apply = (t: "light" | "dark" | "system" | undefined) => {
+      if (t === "dark") {
+        root.classList.add("dark");
+        root.classList.remove("light");
+      } else if (t === "light") {
+        root.classList.remove("dark");
+        root.classList.add("light");
+      } else {
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        root.classList.toggle("dark", prefersDark);
+        root.classList.remove("light");
+      }
+    };
+    apply(theme);
+    if (theme === "system") {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      const handler = () => apply("system");
+      mq.addEventListener("change", handler);
+      return () => mq.removeEventListener("change", handler);
+    }
+  }, [theme]);
+  return null;
+}
+
 function RootComponent() {
   const [qc] = useState(() => new QueryClient());
   return (
     <QueryClientProvider client={qc}>
       <AuthProvider>
         <ProfileProvider>
+          <ThemeApplier />
           <HouseholdProvider>
             <Outlet />
             <Toaster />
