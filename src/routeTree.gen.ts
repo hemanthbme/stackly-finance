@@ -18,6 +18,8 @@ import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppReportsRouteImport } from './routes/_app.reports'
 import { Route as AppMonthlyRouteImport } from './routes/_app.monthly'
 import { Route as AppMembersRouteImport } from './routes/_app.members'
+import { Route as AppInboxRouteImport } from './routes/_app.inbox'
+import { Route as AppHelpRouteImport } from './routes/_app.help'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppConnectedRouteImport } from './routes/_app.connected'
 import { Route as AppBudgetRouteImport } from './routes/_app.budget'
@@ -68,6 +70,16 @@ const AppMembersRoute = AppMembersRouteImport.update({
   path: '/members',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInboxRoute = AppInboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHelpRoute = AppHelpRouteImport.update({
+  id: '/help',
+  path: '/help',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -103,6 +115,8 @@ export interface FileRoutesByFullPath {
   '/budget': typeof AppBudgetRoute
   '/connected': typeof AppConnectedRoute
   '/dashboard': typeof AppDashboardRoute
+  '/help': typeof AppHelpRoute
+  '/inbox': typeof AppInboxRoute
   '/members': typeof AppMembersRoute
   '/monthly': typeof AppMonthlyRoute
   '/reports': typeof AppReportsRoute
@@ -118,6 +132,8 @@ export interface FileRoutesByTo {
   '/budget': typeof AppBudgetRoute
   '/connected': typeof AppConnectedRoute
   '/dashboard': typeof AppDashboardRoute
+  '/help': typeof AppHelpRoute
+  '/inbox': typeof AppInboxRoute
   '/members': typeof AppMembersRoute
   '/monthly': typeof AppMonthlyRoute
   '/reports': typeof AppReportsRoute
@@ -135,6 +151,8 @@ export interface FileRoutesById {
   '/_app/budget': typeof AppBudgetRoute
   '/_app/connected': typeof AppConnectedRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/help': typeof AppHelpRoute
+  '/_app/inbox': typeof AppInboxRoute
   '/_app/members': typeof AppMembersRoute
   '/_app/monthly': typeof AppMonthlyRoute
   '/_app/reports': typeof AppReportsRoute
@@ -152,6 +170,8 @@ export interface FileRouteTypes {
     | '/budget'
     | '/connected'
     | '/dashboard'
+    | '/help'
+    | '/inbox'
     | '/members'
     | '/monthly'
     | '/reports'
@@ -167,6 +187,8 @@ export interface FileRouteTypes {
     | '/budget'
     | '/connected'
     | '/dashboard'
+    | '/help'
+    | '/inbox'
     | '/members'
     | '/monthly'
     | '/reports'
@@ -183,6 +205,8 @@ export interface FileRouteTypes {
     | '/_app/budget'
     | '/_app/connected'
     | '/_app/dashboard'
+    | '/_app/help'
+    | '/_app/inbox'
     | '/_app/members'
     | '/_app/monthly'
     | '/_app/reports'
@@ -262,6 +286,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMembersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/inbox': {
+      id: '/_app/inbox'
+      path: '/inbox'
+      fullPath: '/inbox'
+      preLoaderRoute: typeof AppInboxRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/help': {
+      id: '/_app/help'
+      path: '/help'
+      fullPath: '/help'
+      preLoaderRoute: typeof AppHelpRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
@@ -306,6 +344,8 @@ interface AppRouteChildren {
   AppBudgetRoute: typeof AppBudgetRoute
   AppConnectedRoute: typeof AppConnectedRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppHelpRoute: typeof AppHelpRoute
+  AppInboxRoute: typeof AppInboxRoute
   AppMembersRoute: typeof AppMembersRoute
   AppMonthlyRoute: typeof AppMonthlyRoute
   AppReportsRoute: typeof AppReportsRoute
@@ -319,6 +359,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppBudgetRoute: AppBudgetRoute,
   AppConnectedRoute: AppConnectedRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppHelpRoute: AppHelpRoute,
+  AppInboxRoute: AppInboxRoute,
   AppMembersRoute: AppMembersRoute,
   AppMonthlyRoute: AppMonthlyRoute,
   AppReportsRoute: AppReportsRoute,
@@ -337,3 +379,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
