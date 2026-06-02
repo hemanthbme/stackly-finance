@@ -76,6 +76,18 @@ function WeeklyPage() {
     const { error } = await supabase.from("weekly_snapshots").upsert(rows, { onConflict: "account_id,week_ending" });
     setSaving(false);
     if (error) return toast.error(error.message);
+
+    // Net worth milestone notifications
+    const milestones = [10000, 25000, 50000, 75000, 100000, 150000, 200000, 250000, 300000, 400000, 500000, 750000, 1000000];
+    const previousNet = accounts
+      .filter((a) => a.include_in_net_worth)
+      .reduce((s, a) => s + signedBalance(a.category, previous[a.id]?.balance ?? 0), 0);
+    const newNet = accounts
+      .filter((a) => a.include_in_net_worth && values[a.id] !== undefined && values[a.id] !== "")
+      .reduce((s, a) => s + signedBalance(a.category, Math.abs(Number(values[a.id]))), 0);
+    const hit = milestones.find((m) => previousNet < m && newNet >= m);
+    if (hit) toast.success("🎉 Net worth milestone hit — you just crossed " + fmtMoney(hit) + "!", { duration: 6000 });
+
     toast.success(`Saved ${rows.length} balances for week ending ${week}`);
   };
 
