@@ -76,6 +76,41 @@ function BudgetPage() {
   const [openBudget, setOpenBudget] = useState(false);
   const [openSpend, setOpenSpend] = useState(false);
   const [openCat, setOpenCat] = useState(false);
+  const [openRecurring, setOpenRecurring] = useState(false);
+  const [recurring, setRecurring] = useState<RecurringEntry[]>(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(localStorage.getItem("stackly:recurring") || "[]"); } catch { return []; }
+  });
+  const persistRecurring = (list: RecurringEntry[]) => {
+    setRecurring(list);
+    if (typeof window !== "undefined") localStorage.setItem("stackly:recurring", JSON.stringify(list));
+  };
+  const [rLabel, setRLabel] = useState("");
+  const [rAmount, setRAmount] = useState("");
+  const [rCategory, setRCategory] = useState("food");
+  const [rMember, setRMember] = useState("");
+  const addRecurring = () => {
+    if (!rLabel.trim() || !rAmount) return;
+    persistRecurring([...recurring, { id: crypto.randomUUID(), label: rLabel.trim(), amount: Number(rAmount), category: rCategory, memberId: rMember }]);
+    setRLabel(""); setRAmount(""); setRCategory("food"); setRMember("");
+  };
+  const removeRecurring = (id: string) => persistRecurring(recurring.filter((r) => r.id !== id));
+  const logRecurring = async (r: RecurringEntry) => {
+    if (!active) return;
+    const isCustom = r.category.startsWith("custom:");
+    const dbCat = isCustom ? "other" : r.category;
+    const labelPrefix = isCustom ? `[${categoryLabel(r.category)}]` : "";
+    const notesValue = [labelPrefix, r.label].filter(Boolean).join(" ").trim() || null;
+    const { error } = await supabase.from("spending_entries").insert({
+      household_id: active.id, amount: r.amount, member_id: r.memberId || null,
+      category: dbCat as any, notes: notesValue,
+      payment_method: null,
+      spent_at: today, spent_local_date: today, user_timezone: tz,
+    } as any);
+    if (error) return toast.error(error.message);
+    loadAll();
+    toast.success("Logged: " + r.label);
+  };
 
   const loadAll = async () => {
     if (!active) return;
