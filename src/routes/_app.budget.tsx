@@ -1060,7 +1060,31 @@ function BudgetPage() {
                           </Select>
                         </div>
                         <div className="space-y-1"><Label className="text-xs">Payment</Label>
-                          <Input value={(editDraft.payment_method as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, payment_method: e.target.value })} />
+                          {paymentMethodOptions.length > 0 ? (
+                            <Select
+                              value={paymentMethodOptions.find((p) => p.label === editDraft.payment_method)?.value || "none"}
+                              onValueChange={(v) => {
+                                const resolved = v === "none"
+                                  ? null
+                                  : (paymentMethodOptions.find((p) => p.value === v)?.label ?? null);
+                                setEditDraft({ ...editDraft, payment_method: resolved });
+                              }}
+                            >
+                              <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">— Not specified —</SelectItem>
+                                {paymentMethodOptions.map((p) => (
+                                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input
+                              value={(editDraft.payment_method as string) ?? ""}
+                              onChange={(e) => setEditDraft({ ...editDraft, payment_method: e.target.value })}
+                              placeholder="Payment method"
+                            />
+                          )}
                         </div>
                         <div className="space-y-1"><Label className="text-xs">Notes</Label>
                           <Input value={(editDraft.notes as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, notes: e.target.value })} />
