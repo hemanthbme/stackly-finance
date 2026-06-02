@@ -699,7 +699,7 @@ function BudgetPage() {
                       </Pie>
                       <RechartsTooltip
                         contentStyle={CHART_TOOLTIP_STYLE}
-                        formatter={(value) => fmtMoney(value as number)}
+                        formatter={(value) => fmtMoney(Number(value))}
                       />
                     </PieChart>
                   </ResponsiveContainer>
@@ -713,7 +713,7 @@ function BudgetPage() {
                       <YAxis type="category" dataKey="label" fontSize={11} width={80} stroke="oklch(0.7 0.04 270)" />
                       <RechartsTooltip
                         contentStyle={CHART_TOOLTIP_STYLE}
-                        formatter={(value) => fmtMoney(value as number)}
+                        formatter={(value) => fmtMoney(Number(value))}
                       />
                       <Bar dataKey="value" name="Spent" radius={[0, 4, 4, 0]} fill="oklch(0.62 0.22 277)" maxBarSize={22} />
                     </BarChart>
