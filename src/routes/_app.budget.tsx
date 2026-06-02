@@ -20,7 +20,7 @@ import { ForecastEngine } from "@/components/ForecastEngine";
 import { useProfile } from "@/lib/profile-context";
 import { todayInTz, startOfWeekInTz, startOfMonthInTz } from "@/lib/tz";
 import {
-  PieChart, Pie, Cell, Tooltip as RechartsTooltip,
+  PieChart, Pie, Cell, Tooltip as RechartsTooltip, Label as RechartsLabel,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
 } from "recharts";
 
