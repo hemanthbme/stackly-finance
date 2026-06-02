@@ -125,7 +125,7 @@ function WeeklyPage() {
               <div className="border-b border-border bg-muted/30 px-4 py-2.5 text-sm font-medium">
                 {memberId === "joint" ? "Joint accounts" : members.find((m) => m.id === memberId)?.name ?? "Unassigned"}
               </div>
-              <table className="w-full text-sm">
+              <table className="hidden md:table w-full text-sm">
                 <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2">Account</th>
@@ -141,7 +141,6 @@ function WeeklyPage() {
                     const current = Number(v);
                     const hasCurrent = v !== "" && !Number.isNaN(current);
                     const liab = isLiability(a.category);
-                    // For assets: up = good. For liabilities: down = good.
                     const rawDiff = hasCurrent && prev ? current - prev.balance : null;
                     const goodDirection = rawDiff === null ? null : (liab ? rawDiff < 0 : rawDiff > 0);
                     return (
@@ -182,6 +181,45 @@ function WeeklyPage() {
                   })}
                 </tbody>
               </table>
+
+              {/* Mobile cards */}
+              <div className="md:hidden divide-y divide-border">
+                {accts.map((a) => {
+                  const v = values[a.id] ?? "";
+                  const prev = previous[a.id];
+                  const current = Number(v);
+                  const hasCurrent = v !== "" && !Number.isNaN(current);
+                  const liab = isLiability(a.category);
+                  const rawDiff = hasCurrent && prev ? current - prev.balance : null;
+                  const goodDirection = rawDiff === null ? null : (liab ? rawDiff < 0 : rawDiff > 0);
+                  return (
+                    <div key={a.id} className="p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium">{a.name}</div>
+                        {liab && <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium uppercase text-destructive">Liability</span>}
+                      </div>
+                      <div className="text-xs text-muted-foreground">{CATEGORY_LABELS[a.category]}</div>
+                      <Input
+                        inputMode="decimal"
+                        value={v}
+                        onChange={(e) => setValues((s) => ({ ...s, [a.id]: e.target.value }))}
+                        placeholder={prev ? String(prev.balance) : "0.00"}
+                      />
+                      {prev && (
+                        <div className="text-xs">
+                          <span className="text-muted-foreground">Last: {fmtMoney(prev.balance)}</span>
+                          {rawDiff !== null && (
+                            <span className={`ml-2 inline-flex items-center gap-1 font-medium ${goodDirection ? "text-success" : rawDiff === 0 ? "text-muted-foreground" : "text-destructive"}`}>
+                              {rawDiff > 0 ? <TrendingUp className="h-3 w-3" /> : rawDiff < 0 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
+                              {rawDiff > 0 ? "+" : ""}{fmtMoney(rawDiff)} this week
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ))}
 
