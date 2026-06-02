@@ -201,7 +201,11 @@ function BudgetPage() {
     setSpending((s.data ?? []).map((r: any) => ({ ...r, amount: Number(r.amount) })) as Spending[]);
     setCategories(((c.data ?? []) as unknown) as CustomCategory[]);
   };
-  useEffect(() => { loadAll(); /* eslint-disable-next-line */ }, [active?.id]);
+  useEffect(() => {
+    loadAll();
+    loadRecurring();
+    /* eslint-disable-next-line */
+  }, [active?.id]);
 
   // ----- merged categories (built-in + custom active) -----
   const allCategories = useMemo(() => {
