@@ -615,7 +615,15 @@ function BudgetPage() {
                 <PeriodCard data={wCard} />
               </div>
 
-              {/* pace placeholder */}
+              {weeklyLimit > 0 && (
+                <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm shadow-card">
+                  <span className="font-medium text-muted-foreground">Weekly pace</span>
+                  <span className={`ml-auto font-medium ${weeklyPaceStatus === "on_track" ? "text-success" : weeklyPaceStatus === "slightly_ahead" ? "text-warning" : "text-destructive"}`}>
+                    {weeklyPaceStatus === "on_track" ? "✅ On track" : weeklyPaceStatus === "slightly_ahead" ? "⚠️ Slightly ahead of pace" : "🚨 Overpacing this week"}
+                  </span>
+                </div>
+              )}
+
 
 
 
