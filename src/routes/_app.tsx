@@ -110,6 +110,23 @@ function AppShell() {
   );
 }
 
+function ThemeToggle() {
+  const { profile, update } = useProfile();
+  const theme = profile?.theme ?? "system";
+  const next = theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
+  const Icon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      title={`Theme: ${theme} (click for ${next})`}
+      onClick={() => update({ theme: next })}
+    >
+      <Icon className="h-4 w-4" />
+    </Button>
+  );
+}
+
 function HouseholdSwitcher() {
   const { households, active, setActiveId, refresh } = useHousehold();
   const [open, setOpen] = useState(false);
