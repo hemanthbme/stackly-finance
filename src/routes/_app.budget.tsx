@@ -845,6 +845,16 @@ function BudgetPage() {
                     />
                   );
                 })()}
+              </div>
+
+            ) : (
+              <div className="mt-3 text-sm text-muted-foreground">Set a monthly budget to see your projection.</div>
+            )}
+
+            {/* Projection chart */}
+            {monthlyLimit > 0 && (
+              <ProjectionChart days={projectionChart} max={chartMax} monthlyLimit={monthlyLimit} />
+            )}
           </div>
 
           <ForecastEngine
@@ -859,16 +869,6 @@ function BudgetPage() {
             daysInMonth={projection.daysInMonth}
             lastMonthTotal={lastMonthTotal}
           />
-
-            ) : (
-              <div className="mt-3 text-sm text-muted-foreground">Set a monthly budget to see your projection.</div>
-            )}
-
-            {/* Projection chart */}
-            {monthlyLimit > 0 && (
-              <ProjectionChart days={projectionChart} max={chartMax} monthlyLimit={monthlyLimit} />
-            )}
-          </div>
 
           {/* Messages */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
