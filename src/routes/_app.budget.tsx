@@ -44,6 +44,12 @@ export const Route = createFileRoute("/_app/budget")({
   component: () => (<RequireHousehold><BudgetPage /></RequireHousehold>),
 });
 
+const isFixedEntry = (s: { notes: string | null }) =>
+  s.notes?.startsWith("[FIXED]") ?? false;
+
+const stripFixedPrefix = (notes: string | null) =>
+  notes?.replace(/^\[FIXED\]\s*/, "") ?? "";
+
 type Period = "daily" | "weekly" | "monthly";
 type BudgetType = "individual" | "combined";
 
