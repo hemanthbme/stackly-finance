@@ -2,7 +2,7 @@ import { Link, Outlet, createFileRoute, useNavigate, useRouterState, redirect } 
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, CalendarRange, Wallet, Users, BarChart3, FileBarChart,
-  PiggyBank, Settings, LogOut, Menu, X, ChevronDown, PlusCircle, Plug,
+  PiggyBank, Settings, LogOut, Menu, X, ChevronDown, PlusCircle, Plug, HelpCircle,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useHousehold } from "@/lib/household-context";
@@ -32,6 +32,7 @@ const NAV = [
   { to: "/monthly", label: "Monthly Summary", icon: BarChart3 },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/reports", label: "Reports", icon: FileBarChart },
+  { to: "/help", label: "Help", icon: HelpCircle },
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
