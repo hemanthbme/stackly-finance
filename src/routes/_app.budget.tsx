@@ -83,7 +83,16 @@ interface CustomCategory {
   id: string; name: string; icon: string | null; color: string | null;
   category_type: "expense" | "income"; is_active: boolean;
 }
-type RecurringEntry = { id: string; label: string; amount: number; category: string; memberId: string };
+type RecurringEntry = {
+  id: string;
+  household_id: string;
+  label: string;
+  amount: number;
+  category: string;
+  member_id: string | null;
+  is_active: boolean;
+  created_at: string;
+};
 
 
 function BudgetPage() {
