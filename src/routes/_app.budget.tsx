@@ -659,15 +659,23 @@ function BudgetPage() {
             <DialogContent>
               <DialogHeader><DialogTitle>Recurring entries</DialogTitle></DialogHeader>
               <div className="space-y-3">
-                {recurring.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No recurring entries yet.</div>
-                ) : (
+                {recurringLoading ? (
                   <div className="space-y-2">
+                    {[1, 2].map((i) => (
+                      <div key={i} className="h-12 animate-pulse rounded-lg bg-muted" />
+                    ))}
+                  </div>
+                ) : recurring.length === 0 ? (
+                  <div className="py-4 text-center text-sm text-muted-foreground">
+                    No recurring entries yet. Add one below.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-auto">
                     {recurring.map((r) => (
                       <div key={r.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 p-2">
                         <div>
                           <div className="text-sm font-medium">{r.label} <span className="text-xs text-muted-foreground">· {fmtMoneyExact(r.amount)}</span></div>
-                          <div className="text-xs text-muted-foreground">{categoryLabel(r.category)}{r.memberId ? " · " + (members.find((m) => m.id === r.memberId)?.name ?? "") : ""}</div>
+                          <div className="text-xs text-muted-foreground">{categoryLabel(r.category)}{r.member_id ? " · " + (members.find((m) => m.id === r.member_id)?.name ?? "") : ""}</div>
                         </div>
                         <div className="flex gap-1">
                           <Button size="sm" variant="outline" onClick={() => logRecurring(r)}>Log now</Button>
