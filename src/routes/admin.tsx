@@ -9,7 +9,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-const ADMIN_EMAIL = "admin@stackly.app"; /* REPLACE WITH YOUR EMAIL */
+const ADMIN_EMAIL = "hmdbme@gmail.com";
 
 type Row = {
   user_id: string;
