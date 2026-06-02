@@ -125,3 +125,120 @@ function AccountsPage() {
     </div>
   );
 }
+
+interface AccountFormFieldsProps {
+  name: string; setName: (v: string) => void;
+  category: AccountCategory; setCategory: (v: AccountCategory) => void;
+  memberId: string; setMemberId: (v: string) => void;
+  ownership: "individual" | "joint"; setOwnership: (v: "individual" | "joint") => void;
+  institution: string; setInstitution: (v: string) => void;
+  include: boolean; setInclude: (v: boolean) => void;
+  members: Member[];
+}
+
+function AccountFormFields({
+  name, setName, category, setCategory, memberId, setMemberId,
+  ownership, setOwnership, institution, setInstitution, include, setInclude, members,
+}: AccountFormFieldsProps) {
+  return (
+    <div className="grid gap-3">
+      <div className="space-y-1.5"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Chase Checking" /></div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5"><Label>Category</Label>
+          <Select value={category} onValueChange={(v) => setCategory(v as AccountCategory)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>{CATS.map((c) => <SelectItem key={c} value={c}>{CATEGORY_LABELS[c]}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5"><Label>Owner</Label>
+          <Select value={memberId || "none"} onValueChange={(v) => setMemberId(v === "none" ? "" : v)}>
+            <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Unassigned</SelectItem>
+              {members.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5"><Label>Ownership</Label>
+          <Select value={ownership} onValueChange={(v) => setOwnership(v as "individual" | "joint")}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="individual">Individual</SelectItem>
+              <SelectItem value="joint">Joint</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5"><Label>Institution</Label><Input value={institution} onChange={(e) => setInstitution(e.target.value)} placeholder="optional" /></div>
+      </div>
+      <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
+        <div><Label>Include in net worth</Label><div className="text-xs text-muted-foreground">Toggle off to track without affecting totals</div></div>
+        <Switch checked={include} onCheckedChange={setInclude} />
+      </div>
+    </div>
+  );
+}
+
+function EditDialog({ account, members, onSaved }: { account: Account; members: Member[]; onSaved: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(account.name);
+  const [category, setCategory] = useState<AccountCategory>(account.category);
+  const [memberId, setMemberId] = useState<string>(account.member_id ?? "");
+  const [ownership, setOwnership] = useState<"individual" | "joint">(account.ownership);
+  const [institution, setInstitution] = useState(account.institution ?? "");
+  const [include, setInclude] = useState(account.include_in_net_worth);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setName(account.name);
+      setCategory(account.category);
+      setMemberId(account.member_id ?? "");
+      setOwnership(account.ownership);
+      setInstitution(account.institution ?? "");
+      setInclude(account.include_in_net_worth);
+    }
+  }, [open, account]);
+
+  const save = async () => {
+    setSaving(true);
+    const { error } = await supabase.from("accounts").update({
+      name: name.trim(),
+      category,
+      member_id: memberId || null,
+      ownership,
+      institution: institution.trim() || null,
+      include_in_net_worth: include,
+    }).eq("id", account.id);
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Account updated");
+    onSaved();
+    setOpen(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="icon" variant="ghost"><Pencil className="h-4 w-4" /></Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Edit account</DialogTitle></DialogHeader>
+        <AccountFormFields
+          name={name} setName={setName}
+          category={category} setCategory={setCategory}
+          memberId={memberId} setMemberId={setMemberId}
+          ownership={ownership} setOwnership={setOwnership}
+          institution={institution} setInstitution={setInstitution}
+          include={include} setInclude={setInclude}
+          members={members}
+        />
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={save} disabled={saving} className="bg-gradient-primary">{saving ? "Saving…" : "Save changes"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
