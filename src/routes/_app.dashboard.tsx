@@ -417,8 +417,3 @@ function DailyBudgetSummary() {
     </div>
   );
 }
-        </>
-      )}
-    </div>
-  );
-}
