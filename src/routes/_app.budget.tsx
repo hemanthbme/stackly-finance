@@ -174,14 +174,17 @@ function BudgetPage() {
   const [sNotes, setSNotes] = useState("");
   const [sPayment, setSPayment] = useState("");
   const [sDate, setSDate] = useState(today);
+  const [sIsFixed, setSIsFixed] = useState(false);
   useEffect(() => { setSDate(today); }, [today]);
+  useEffect(() => { if (!openSpend) setSIsFixed(false); }, [openSpend]);
   const addSpend = async () => {
     if (!active || !sAmount) return;
     // Custom categories use the "other" enum + store real name in notes prefix
     const isCustom = sCategory.startsWith("custom:");
     const dbCat = isCustom ? "other" : sCategory;
     const labelPrefix = isCustom ? `[${categoryLabel(sCategory)}]` : "";
-    const notesValue = [labelPrefix, sNotes].filter(Boolean).join(" ").trim() || null;
+    const fixedPrefix = sIsFixed ? "[FIXED] " : "";
+    const notesValue = [fixedPrefix + labelPrefix, sNotes].filter(Boolean).join(" ").trim() || null;
     const { error } = await supabase.from("spending_entries").insert({
       household_id: active.id, amount: Number(sAmount), member_id: sMember || null,
       category: dbCat as any, notes: notesValue,
@@ -189,7 +192,7 @@ function BudgetPage() {
       spent_at: sDate, spent_local_date: sDate, user_timezone: tz,
     } as any);
     if (error) return toast.error(error.message);
-    setSAmount(""); setSNotes(""); setSPayment(""); setOpenSpend(false); loadAll();
+    setSAmount(""); setSNotes(""); setSPayment(""); setSIsFixed(false); setOpenSpend(false); loadAll();
     toast.success("Spending logged");
   };
 
