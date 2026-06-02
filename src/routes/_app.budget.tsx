@@ -17,6 +17,27 @@ import { Plus, Trash2, Sparkles, Flame, TrendingDown, TrendingUp, Pencil, Save, 
 import { StatCard } from "@/components/StatCard";
 import { useProfile } from "@/lib/profile-context";
 import { todayInTz, startOfWeekInTz, startOfMonthInTz } from "@/lib/tz";
+import {
+  PieChart, Pie, Cell, Tooltip as RechartsTooltip,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
+} from "recharts";
+
+const PIE_COLORS = [
+  "oklch(0.62 0.22 277)",
+  "oklch(0.74 0.17 160)",
+  "oklch(0.72 0.21 55)",
+  "oklch(0.65 0.24 20)",
+  "oklch(0.70 0.18 220)",
+  "oklch(0.68 0.20 310)",
+  "oklch(0.76 0.15 100)",
+  "oklch(0.60 0.22 0)",
+];
+
+const CHART_TOOLTIP_STYLE = {
+  background: "oklch(0.18 0.05 280)",
+  border: "1px solid oklch(0.28 0.05 280)",
+  borderRadius: 8,
+};
 
 export const Route = createFileRoute("/_app/budget")({
   component: () => (<RequireHousehold><BudgetPage /></RequireHousehold>),
