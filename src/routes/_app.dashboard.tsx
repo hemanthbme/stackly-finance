@@ -394,6 +394,29 @@ function DailyBudgetSummary() {
             </div>
             <span className="text-sm font-medium">{fmtMoney(totalFixedMonth)}</span>
           </div>
+          {creditsCountMonth > 0 && (
+            <>
+              <div className="border-t border-border my-3" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-success border border-success/20">
+                    Credits
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {creditsCountMonth} {creditsCountMonth === 1 ? "return" : "returns"} this month
+                  </span>
+                </div>
+                <span className="text-sm font-medium text-success">
+                  +{fmtMoney(totalCreditsMonth)}
+                </span>
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
         </>
       )}
     </div>
