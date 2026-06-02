@@ -95,6 +95,21 @@ function AnalyticsPage() {
             <SelectContent>{accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
           </Select>
         )}
+        <div className="flex rounded-lg border border-border overflow-hidden">
+          {(["3M", "6M", "1Y", "All"] as const).map((r) => (
+            <button
+              key={r}
+              onClick={() => setRange(r)}
+              className={`px-3 py-1.5 text-sm transition-colors ${
+                range === r
+                  ? "bg-gradient-primary text-primary-foreground"
+                  : "bg-card text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
