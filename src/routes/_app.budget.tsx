@@ -886,8 +886,13 @@ function BudgetPage() {
                 return (
                   <div key={s.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
                     <div>
-                      <div className="text-sm font-medium">{fmtMoneyExact(s.amount)} <span className="text-xs text-muted-foreground">· {cat}</span></div>
-                      <div className="text-xs text-muted-foreground">{s.spent_at} · {m?.name ?? "Household"}{s.payment_method ? ` · ${s.payment_method}` : ""}{s.notes ? ` · ${s.notes}` : ""}</div>
+                      <div className="text-sm font-medium flex items-center gap-2">
+                        <span>{fmtMoneyExact(s.amount)} <span className="text-xs text-muted-foreground">· {cat}</span></span>
+                        {isFixedEntry(s) && (
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Fixed</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">{s.spent_at} · {m?.name ?? "Household"}{s.payment_method ? ` · ${s.payment_method}` : ""}{(() => { const n = stripFixedPrefix(s.notes); return n ? ` · ${n}` : ""; })()}</div>
                     </div>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" onClick={() => startEdit(s)}><Pencil className="h-4 w-4" /></Button>
