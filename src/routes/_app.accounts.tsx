@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { Account, Member } from "@/lib/data-hooks";
 import { RequireHousehold } from "@/components/RequireHousehold";
 import { useAccounts, useMembers } from "@/lib/data-hooks";
 import { useHousehold } from "@/lib/household-context";
@@ -11,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { CATEGORY_LABELS, type AccountCategory, isAsset } from "@/lib/finance";
 import { Badge } from "@/components/ui/badge";
 
@@ -67,42 +68,15 @@ function AccountsPage() {
           <DialogTrigger asChild><Button className="bg-gradient-primary"><Plus className="mr-1 h-4 w-4" />Add account</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>New account</DialogTitle></DialogHeader>
-            <div className="grid gap-3">
-              <div className="space-y-1.5"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Chase Checking" /></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5"><Label>Category</Label>
-                  <Select value={category} onValueChange={(v) => setCategory(v as AccountCategory)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{CATS.map((c) => <SelectItem key={c} value={c}>{CATEGORY_LABELS[c]}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5"><Label>Owner</Label>
-                  <Select value={memberId || "none"} onValueChange={(v) => setMemberId(v === "none" ? "" : v)}>
-                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Unassigned</SelectItem>
-                      {members.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5"><Label>Ownership</Label>
-                  <Select value={ownership} onValueChange={(v) => setOwnership(v as any)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="individual">Individual</SelectItem>
-                      <SelectItem value="joint">Joint</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5"><Label>Institution</Label><Input value={institution} onChange={(e) => setInstitution(e.target.value)} placeholder="optional" /></div>
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
-                <div><Label>Include in net worth</Label><div className="text-xs text-muted-foreground">Toggle off to track without affecting totals</div></div>
-                <Switch checked={include} onCheckedChange={setInclude} />
-              </div>
-            </div>
+            <AccountFormFields
+              name={name} setName={setName}
+              category={category} setCategory={setCategory}
+              memberId={memberId} setMemberId={setMemberId}
+              ownership={ownership} setOwnership={setOwnership}
+              institution={institution} setInstitution={setInstitution}
+              include={include} setInclude={setInclude}
+              members={members}
+            />
             <DialogFooter><Button onClick={add} className="bg-gradient-primary">Add account</Button></DialogFooter>
           </DialogContent>
         </Dialog>
@@ -136,7 +110,10 @@ function AccountsPage() {
                   <td className="px-4 py-3">{m?.name ?? <span className="text-muted-foreground">—</span>}</td>
                   <td className="px-4 py-3 capitalize">{a.ownership}</td>
                   <td className="px-4 py-3 text-right">
-                    <Button size="icon" variant="ghost" onClick={() => remove(a.id)}><Trash2 className="h-4 w-4" /></Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <EditDialog account={a} members={members} onSaved={refresh} />
+                      <Button size="icon" variant="ghost" onClick={() => remove(a.id)}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -146,5 +123,122 @@ function AccountsPage() {
         </table>
       </div>
     </div>
+  );
+}
+
+interface AccountFormFieldsProps {
+  name: string; setName: (v: string) => void;
+  category: AccountCategory; setCategory: (v: AccountCategory) => void;
+  memberId: string; setMemberId: (v: string) => void;
+  ownership: "individual" | "joint"; setOwnership: (v: "individual" | "joint") => void;
+  institution: string; setInstitution: (v: string) => void;
+  include: boolean; setInclude: (v: boolean) => void;
+  members: Member[];
+}
+
+function AccountFormFields({
+  name, setName, category, setCategory, memberId, setMemberId,
+  ownership, setOwnership, institution, setInstitution, include, setInclude, members,
+}: AccountFormFieldsProps) {
+  return (
+    <div className="grid gap-3">
+      <div className="space-y-1.5"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Chase Checking" /></div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5"><Label>Category</Label>
+          <Select value={category} onValueChange={(v) => setCategory(v as AccountCategory)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>{CATS.map((c) => <SelectItem key={c} value={c}>{CATEGORY_LABELS[c]}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5"><Label>Owner</Label>
+          <Select value={memberId || "none"} onValueChange={(v) => setMemberId(v === "none" ? "" : v)}>
+            <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Unassigned</SelectItem>
+              {members.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5"><Label>Ownership</Label>
+          <Select value={ownership} onValueChange={(v) => setOwnership(v as "individual" | "joint")}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="individual">Individual</SelectItem>
+              <SelectItem value="joint">Joint</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5"><Label>Institution</Label><Input value={institution} onChange={(e) => setInstitution(e.target.value)} placeholder="optional" /></div>
+      </div>
+      <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
+        <div><Label>Include in net worth</Label><div className="text-xs text-muted-foreground">Toggle off to track without affecting totals</div></div>
+        <Switch checked={include} onCheckedChange={setInclude} />
+      </div>
+    </div>
+  );
+}
+
+function EditDialog({ account, members, onSaved }: { account: Account; members: Member[]; onSaved: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(account.name);
+  const [category, setCategory] = useState<AccountCategory>(account.category);
+  const [memberId, setMemberId] = useState<string>(account.member_id ?? "");
+  const [ownership, setOwnership] = useState<"individual" | "joint">(account.ownership);
+  const [institution, setInstitution] = useState(account.institution ?? "");
+  const [include, setInclude] = useState(account.include_in_net_worth);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setName(account.name);
+      setCategory(account.category);
+      setMemberId(account.member_id ?? "");
+      setOwnership(account.ownership);
+      setInstitution(account.institution ?? "");
+      setInclude(account.include_in_net_worth);
+    }
+  }, [open, account]);
+
+  const save = async () => {
+    setSaving(true);
+    const { error } = await supabase.from("accounts").update({
+      name: name.trim(),
+      category,
+      member_id: memberId || null,
+      ownership,
+      institution: institution.trim() || null,
+      include_in_net_worth: include,
+    }).eq("id", account.id);
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Account updated");
+    onSaved();
+    setOpen(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="icon" variant="ghost"><Pencil className="h-4 w-4" /></Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Edit account</DialogTitle></DialogHeader>
+        <AccountFormFields
+          name={name} setName={setName}
+          category={category} setCategory={setCategory}
+          memberId={memberId} setMemberId={setMemberId}
+          ownership={ownership} setOwnership={setOwnership}
+          institution={institution} setInstitution={setInstitution}
+          include={include} setInclude={setInclude}
+          members={members}
+        />
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={save} disabled={saving} className="bg-gradient-primary">{saving ? "Saving…" : "Save changes"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
