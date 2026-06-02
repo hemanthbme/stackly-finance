@@ -16,8 +16,17 @@ function AnalyticsPage() {
   const [view, setView] = useState<"net" | "assets" | "liabilities" | "category" | "account">("net");
   const [accountId, setAccountId] = useState<string>(accounts[0]?.id ?? "");
   const [categoryFilter, setCategoryFilter] = useState<AccountCategory>("checking");
+  const [range, setRange] = useState<"3M" | "6M" | "1Y" | "All">("All");
 
-  const weeks = useMemo(() => Array.from(new Set(snapshots.map((s) => s.week_ending))).sort(), [snapshots]);
+  const weeks = useMemo(() => {
+    const all = Array.from(new Set(snapshots.map((s) => s.week_ending))).sort();
+    if (range === "All") return all;
+    const days = range === "3M" ? 90 : range === "6M" ? 180 : 365;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const cutoffIso = cutoff.toISOString().slice(0, 10);
+    return all.filter((w) => w >= cutoffIso);
+  }, [snapshots, range]);
 
   const series = useMemo(() => {
     return weeks.map((w) => {
