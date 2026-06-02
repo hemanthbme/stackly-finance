@@ -498,18 +498,33 @@ function BudgetPage() {
   }, [spending, monthStart]);
 
   const catBreakdown = useMemo(() => {
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
-    const cutoffIso = cutoff.toISOString().slice(0, 10);
     const map = new Map<string, number>();
-    for (const s of spending) {
-      if (localDate(s) < cutoffIso) continue;
+    for (const s of pureVariableSpending) {
+      const d = s.spent_local_date || s.spent_at;
+      if (d < monthStart || d > today) continue;
       map.set(s.category, (map.get(s.category) ?? 0) + s.amount);
     }
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
-      .map(([k, v]) => ({ key: k, label: SPENDING_CATEGORIES.find((c) => c.value === k)?.label ?? k, value: v }));
-  }, [spending]);
+      .map(([k, v]) => ({
+        key: k,
+        label: allCategories.find((c) => c.value === k)?.label ?? k,
+        value: v,
+      }));
+  }, [pureVariableSpending, monthStart, today, allCategories]);
   const catMax = Math.max(1, ...catBreakdown.map((c) => c.value));
+
+  const PAYMENT_ACCOUNT_CATEGORIES = ["checking", "savings", "credit_card"];
+  const paymentMethodOptions = useMemo(() => {
+    return accounts
+      .filter((a) => PAYMENT_ACCOUNT_CATEGORIES.includes(a.category) && a.is_active)
+      .map((a) => ({
+        value: a.id,
+        label: a.institution ? `${a.name} — ${a.institution}` : a.name,
+        category: a.category,
+      }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts]);
 
   return (
     <div className="space-y-6">
