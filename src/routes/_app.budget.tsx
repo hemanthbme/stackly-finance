@@ -302,6 +302,8 @@ function BudgetPage() {
 
   const variableSpending = spending.filter((s) => !isFixedEntry(s));
   const fixedSpending = spending.filter((s) => isFixedEntry(s));
+  const creditSpending = spending.filter((s) => isCreditEntry(s));
+  const pureVariableSpending = variableSpending.filter((s) => !isCreditEntry(s));
 
   const sumWindowFiltered = (entries: typeof spending, start: string, memberFilter?: string | null) =>
     entries
@@ -313,19 +315,26 @@ function BudgetPage() {
       .reduce((sum, x) => sum + x.amount, 0);
 
   const sumWindow = (start: string, memberFilter?: string | null) =>
-    sumWindowFiltered(variableSpending, start, memberFilter);
+    sumWindowFiltered(pureVariableSpending, start, memberFilter);
 
-  const totalVariableToday = sumWindowFiltered(variableSpending, today);
-  const totalVariableWeek = sumWindowFiltered(variableSpending, weekStart);
-  const totalVariableMonth = sumWindowFiltered(variableSpending, monthStart);
+  const totalVariableToday = sumWindowFiltered(pureVariableSpending, today);
+  const totalVariableWeek = sumWindowFiltered(pureVariableSpending, weekStart);
+  const totalVariableMonth = sumWindowFiltered(pureVariableSpending, monthStart);
   const totalFixedToday = sumWindowFiltered(fixedSpending, today);
   const totalFixedWeek = sumWindowFiltered(fixedSpending, weekStart);
   const totalFixedMonth = sumWindowFiltered(fixedSpending, monthStart);
+  const totalCreditsToday = sumWindowFiltered(creditSpending, today);
+  const totalCreditsWeek = sumWindowFiltered(creditSpending, weekStart);
+  const totalCreditsMonth = sumWindowFiltered(creditSpending, monthStart);
+  const creditsCountMonth = creditSpending.filter((s) => {
+    const d = s.spent_local_date || s.spent_at;
+    return d >= monthStart && d <= today;
+  }).length;
   // Back-compat aliases (downstream projection/charts use variable totals)
   const totalToday = totalVariableToday;
   const totalWeek = totalVariableWeek;
   const totalMonth = totalVariableMonth;
-  void totalFixedToday; void totalFixedWeek;
+  void totalFixedToday; void totalFixedWeek; void totalCreditsWeek;
 
   const combinedDaily = budgets.find((b) => b.budget_type === "combined" && b.period === "daily" && b.is_active);
 
