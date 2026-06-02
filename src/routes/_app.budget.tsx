@@ -583,8 +583,7 @@ function BudgetPage() {
             </DialogContent>
           </Dialog>
         </div>
-
-
+      </div>
 
       {/* Status */}
       <div className={`flex items-center gap-3 rounded-2xl border p-4 shadow-card transition-colors
