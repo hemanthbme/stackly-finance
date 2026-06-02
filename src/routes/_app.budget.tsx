@@ -518,7 +518,7 @@ function BudgetPage() {
                 return (
                   <div key={member.id} className="rounded-2xl border border-border bg-card p-5 shadow-card">
                     <div className="flex items-center gap-3">
-                      <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-primary font-display font-bold">{member.name[0]?.toUpperCase()}</div>
+                      <div className="grid h-10 w-10 place-items-center rounded-full font-display font-bold" style={{ background: member.color ?? "#4f46e5" }}>{member.name[0]?.toUpperCase()}</div>
                       <div className="flex-1">
                         <div className="text-xs uppercase tracking-wider text-muted-foreground">{member.name} · {period}</div>
                         <div className="font-display text-xl font-bold">{fmtMoney(spent)}{hasBudget && <span className="ml-1 text-xs font-normal text-muted-foreground">of {fmtMoney(limit)}</span>}</div>
