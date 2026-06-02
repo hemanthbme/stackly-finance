@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RequireHousehold } from "@/components/RequireHousehold";
 import { useAccounts, useLatestBalances, useMembers, useSnapshots } from "@/lib/data-hooks";
+import { useHousehold } from "@/lib/household-context";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { CATEGORY_LABELS, fmtMoney, isAsset, isLiability } from "@/lib/finance";
+import { CATEGORY_LABELS, fmtMoney, isAsset, isLiability, SPENDING_CATEGORIES } from "@/lib/finance";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
 
@@ -22,10 +24,20 @@ function downloadCsv(name: string, rows: (string | number)[][]) {
 }
 
 function ReportsPage() {
+  const { active } = useHousehold();
   const { data: accounts } = useAccounts();
   const { data: snapshots } = useSnapshots();
   const { data: members } = useMembers();
   const balances = useLatestBalances(accounts, snapshots);
+  const [spendingEntries, setSpendingEntries] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!active) return;
+    (async () => {
+      const { data } = await supabase.from("spending_entries").select("*").eq("household_id", active.id).order("spent_at");
+      setSpendingEntries(data ?? []);
+    })();
+  }, [active?.id]);
 
   const reports = useMemo(() => {
     const weekly = () => {
@@ -61,14 +73,24 @@ function ReportsPage() {
       }
       return rows;
     };
-    return { weekly, netWorth, debt, savings };
-  }, [snapshots, accounts, members, balances]);
+    const spending = () => {
+      const rows: (string | number)[][] = [["Date", "Member", "Category", "Amount", "Payment Method", "Notes"]];
+      for (const s of spendingEntries) {
+        const member = members.find((m) => m.id === s.member_id)?.name ?? "Household";
+        const cat = SPENDING_CATEGORIES.find((c) => c.value === s.category)?.label ?? s.category;
+        rows.push([s.spent_at, member, cat, Number(s.amount), s.payment_method ?? "", s.notes ?? ""]);
+      }
+      return rows;
+    };
+    return { weekly, netWorth, debt, savings, spending };
+  }, [snapshots, accounts, members, balances, spendingEntries]);
 
   const cards = [
     { title: "Weekly Report", desc: "Every weekly snapshot, exportable.", action: () => downloadCsv("stackly-weekly.csv", reports.weekly()) },
     { title: "Net Worth Report", desc: "Latest balances per account with totals.", action: () => downloadCsv("stackly-net-worth.csv", reports.netWorth()) },
     { title: "Debt Report", desc: "Outstanding liabilities by account.", action: () => downloadCsv("stackly-debt.csv", reports.debt()) },
     { title: "Savings Report", desc: "Asset balances across the household.", action: () => downloadCsv("stackly-savings.csv", reports.savings()) },
+    { title: "Spending Report", desc: "Every logged spending entry with category and member.", action: () => downloadCsv("stackly-spending.csv", reports.spending()) },
   ];
 
   const totalAssets = accounts.filter((a) => isAsset(a.category) && a.include_in_net_worth).reduce((s, a) => s + (balances.get(a.id)?.current ?? 0), 0);
