@@ -308,6 +308,20 @@ function BudgetPage() {
     };
   }, [monthStart, today, totalMonth, monthlyLimit]);
 
+  const lastMonthTotal = useMemo(() => {
+    const [yy, mm] = monthStart.split("-").map(Number);
+    const prevMonthStart = mm === 1
+      ? `${yy - 1}-12-01`
+      : `${yy}-${String(mm - 1).padStart(2, "0")}-01`;
+    const prevMonthEnd = `${yy}-${String(mm).padStart(2, "0")}-01`;
+    return spending
+      .filter((s) => {
+        const d = s.spent_local_date || s.spent_at;
+        return d >= prevMonthStart && d < prevMonthEnd;
+      })
+      .reduce((sum, s) => sum + s.amount, 0);
+  }, [spending, monthStart]);
+
   // Projection chart data (full month)
   const projectionChart = useMemo(() => {
     const [yy, mm] = monthStart.split("-").map(Number);
