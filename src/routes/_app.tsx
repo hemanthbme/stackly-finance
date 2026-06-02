@@ -2,7 +2,7 @@ import { Link, Outlet, createFileRoute, useNavigate, useRouterState, redirect } 
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, CalendarRange, Wallet, Users, BarChart3, FileBarChart,
-  PiggyBank, Settings, LogOut, Menu, X, ChevronDown, PlusCircle, Plug,
+  PiggyBank, Settings, LogOut, Menu, X, ChevronDown, PlusCircle, Plug, HelpCircle,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useHousehold } from "@/lib/household-context";
