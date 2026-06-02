@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Trash2, KeyRound } from "lucide-react";
+import { Trash2, KeyRound, UserPlus, Copy, Mail } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { COMMON_TIMEZONES, browserTz } from "@/lib/tz";
 
 export const Route = createFileRoute("/_app/settings")({
