@@ -977,7 +977,12 @@ function BudgetPage() {
 
           {/* Category breakdown */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
-            <h3 className="font-display text-lg font-semibold">Spending breakdown (30d)</h3>
+            <div className="flex items-baseline justify-between gap-3">
+              <h3 className="font-display text-lg font-semibold">Spending breakdown</h3>
+              <span className="text-xs text-muted-foreground">
+                {new Date(monthStart + "T12:00:00").toLocaleString("default", { month: "long", year: "numeric" })}
+              </span>
+            </div>
             {catBreakdown.length === 0 ? (
               <div className="py-6 text-center text-sm text-muted-foreground">Nothing logged yet.</div>
             ) : (
@@ -999,6 +1004,24 @@ function BudgetPage() {
                         {catBreakdown.map((_, i) => (
                           <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                         ))}
+                        <RechartsLabel
+                          position="center"
+                          content={({ viewBox }) => {
+                            if (!viewBox || !("cx" in viewBox)) return null;
+                            const { cx, cy } = viewBox as { cx: number; cy: number };
+                            const total = catBreakdown.reduce((s, c) => s + c.value, 0);
+                            return (
+                              <g>
+                                <text x={cx} y={cy - 8} textAnchor="middle" className="fill-muted-foreground" style={{ fontSize: 11 }}>
+                                  Total
+                                </text>
+                                <text x={cx} y={cy + 12} textAnchor="middle" className="fill-foreground" style={{ fontSize: 16, fontWeight: 600 }}>
+                                  {fmtMoney(total)}
+                                </text>
+                              </g>
+                            );
+                          }}
+                        />
                       </Pie>
                       <RechartsTooltip
                         contentStyle={CHART_TOOLTIP_STYLE}
