@@ -325,13 +325,17 @@ function DailyBudgetSummary() {
 
   const variableEntries = entries.filter((e) => !isFixedEntry(e));
   const fixedEntries = entries.filter((e) => isFixedEntry(e));
+  const creditEntries = entries.filter((e) => isCreditEntry(e));
+  const pureVariableEntries = variableEntries.filter((e) => !isCreditEntry(e));
   const dateOf = (e: typeof entries[number]) => e.spent_local_date || e.spent_at;
 
-  const totalVariableToday = variableEntries.filter((e) => dateOf(e) === today).reduce((s, e) => s + e.amount, 0);
-  const totalVariableWeek = variableEntries.filter((e) => dateOf(e) >= weekStart && dateOf(e) <= today).reduce((s, e) => s + e.amount, 0);
-  const totalVariableMonth = variableEntries.filter((e) => dateOf(e) >= monthStart && dateOf(e) <= today).reduce((s, e) => s + e.amount, 0);
+  const totalVariableToday = pureVariableEntries.filter((e) => dateOf(e) === today).reduce((s, e) => s + e.amount, 0);
+  const totalVariableWeek = pureVariableEntries.filter((e) => dateOf(e) >= weekStart && dateOf(e) <= today).reduce((s, e) => s + e.amount, 0);
+  const totalVariableMonth = pureVariableEntries.filter((e) => dateOf(e) >= monthStart && dateOf(e) <= today).reduce((s, e) => s + e.amount, 0);
   const totalFixedMonth = fixedEntries.filter((e) => dateOf(e) >= monthStart && dateOf(e) <= today).reduce((s, e) => s + e.amount, 0);
   const fixedCountMonth = fixedEntries.filter((e) => dateOf(e) >= monthStart && dateOf(e) <= today).length;
+  const totalCreditsMonth = creditEntries.filter((e) => dateOf(e) >= monthStart && dateOf(e) <= today).reduce((s, e) => s + e.amount, 0);
+  const creditsCountMonth = creditEntries.filter((e) => dateOf(e) >= monthStart && dateOf(e) <= today).length;
 
   const rows = [
     { label: "Today", spent: totalVariableToday, limit: variableDailyLimit },
