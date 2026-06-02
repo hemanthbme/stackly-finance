@@ -615,6 +615,22 @@ function BudgetPage() {
                 <PeriodCard data={wCard} />
               </div>
 
+              {weeklyLimit > 0 && (() => {
+                const pace = weeklyPaceStatus === "on_track"
+                  ? { icon: "✅", label: "On track", color: "text-success" }
+                  : weeklyPaceStatus === "slightly_ahead"
+                  ? { icon: "⚠️", label: "Slightly ahead of pace", color: "text-warning" }
+                  : { icon: "🚨", label: "Overpacing this week", color: "text-destructive" };
+                return (
+                  <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm shadow-card">
+                    <span className="font-medium text-muted-foreground">Weekly pace</span>
+                    <span className={`ml-auto font-medium ${pace.color}`}>{pace.icon} {pace.label}</span>
+                  </div>
+                );
+              })()}
+
+
+
               {/* Combined month spend display */}
               <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
