@@ -441,10 +441,21 @@ function BudgetPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1.5"><Label>Category</Label>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label>Category</Label>
+                      <Button variant="ghost" type="button" className="h-auto p-0 text-xs text-primary" onClick={() => { setOpenSpend(false); setOpenCat(true); }}>+ New category</Button>
+                    </div>
                     <Select value={sCategory} onValueChange={setSCategory}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{allCategories.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                      <SelectContent>{allCategories.map((c) => (
+                        <SelectItem key={c.value} value={c.value}>
+                          {c.value.startsWith("custom:") && (
+                            <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: c.color ?? "#4f46e5", marginRight: 6 }} />
+                          )}
+                          {c.label}
+                        </SelectItem>
+                      ))}</SelectContent>
                     </Select>
                   </div>
                 </div>
