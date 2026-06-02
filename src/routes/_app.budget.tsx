@@ -205,6 +205,9 @@ function BudgetPage() {
   }, [openSpend]);
   const addSpend = async () => {
     if (!active || !sAmount) return;
+    const resolvedPaymentMethod = sPayment
+      ? (paymentMethodOptions.find((p) => p.value === sPayment)?.label ?? sPayment)
+      : null;
     if (sIsCredit) {
       const creditLabel = CREDIT_CATEGORIES.find((c) => c.value === sCreditCategory)?.label ?? sCreditCategory;
       const notesValue = [`[CREDIT] ${creditLabel}`, sNotes].filter(Boolean).join(" — ").trim() || `[CREDIT] ${creditLabel}`;
