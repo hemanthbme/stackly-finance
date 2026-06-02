@@ -240,6 +240,7 @@ export type Database = {
         Row: {
           accepted_at: string | null
           accepted_by: string | null
+          access_level: string
           created_at: string
           expires_at: string
           household_id: string
@@ -254,6 +255,7 @@ export type Database = {
         Insert: {
           accepted_at?: string | null
           accepted_by?: string | null
+          access_level?: string
           created_at?: string
           expires_at?: string
           household_id: string
@@ -268,6 +270,7 @@ export type Database = {
         Update: {
           accepted_at?: string | null
           accepted_by?: string | null
+          access_level?: string
           created_at?: string
           expires_at?: string
           household_id?: string
@@ -283,33 +286,39 @@ export type Database = {
       }
       household_members: {
         Row: {
+          access_level: string
           color: string | null
           created_at: string
           created_by: string
           household_id: string
           id: string
+          invited_by: string | null
           name: string
           relationship: string | null
           role: Database["public"]["Enums"]["member_role"]
           user_id: string | null
         }
         Insert: {
+          access_level?: string
           color?: string | null
           created_at?: string
           created_by?: string
           household_id: string
           id?: string
+          invited_by?: string | null
           name: string
           relationship?: string | null
           role?: Database["public"]["Enums"]["member_role"]
           user_id?: string | null
         }
         Update: {
+          access_level?: string
           color?: string | null
           created_at?: string
           created_by?: string
           household_id?: string
           id?: string
+          invited_by?: string | null
           name?: string
           relationship?: string | null
           role?: Database["public"]["Enums"]["member_role"]
@@ -567,6 +576,44 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_household_invite: {
+        Args: { _name: string; _token: string }
+        Returns: string
+      }
+      admin_get_users: {
+        Args: never
+        Returns: {
+          email: string
+          last_active_at: string
+          signed_up_at: string
+          user_id: string
+        }[]
+      }
+      admin_user_summary: {
+        Args: never
+        Returns: {
+          email: string
+          household_id: string
+          household_name: string
+          last_active_at: string
+          member_count: number
+          member_names: string
+          signed_up_at: string
+          user_id: string
+        }[]
+      }
+      get_invite_preview: {
+        Args: { _token: string }
+        Returns: {
+          access_level: string
+          created_by: string
+          expires_at: string
+          household_id: string
+          household_name: string
+          status: string
+        }[]
+      }
+      is_admin: { Args: never; Returns: boolean }
       is_household_member: { Args: { _household_id: string }; Returns: boolean }
       is_household_owner: { Args: { _household_id: string }; Returns: boolean }
     }
