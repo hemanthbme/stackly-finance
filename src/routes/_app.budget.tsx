@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { RequireHousehold } from "@/components/RequireHousehold";
 import { useHousehold } from "@/lib/household-context";
-import { useMembers } from "@/lib/data-hooks";
+import { useMembers, useAccounts } from "@/lib/data-hooks";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,7 @@ import { ForecastEngine } from "@/components/ForecastEngine";
 import { useProfile } from "@/lib/profile-context";
 import { todayInTz, startOfWeekInTz, startOfMonthInTz } from "@/lib/tz";
 import {
-  PieChart, Pie, Cell, Tooltip as RechartsTooltip,
+  PieChart, Pie, Cell, Tooltip as RechartsTooltip, Label as RechartsLabel,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
 } from "recharts";
 
@@ -89,6 +89,7 @@ type RecurringEntry = { id: string; label: string; amount: number; category: str
 function BudgetPage() {
   const { active } = useHousehold();
   const { data: members } = useMembers();
+  const { data: accounts } = useAccounts();
   const { profile } = useProfile();
   const tz = profile?.user_timezone || "UTC";
   const weekStartDay = profile?.week_start || "sunday";
@@ -204,6 +205,9 @@ function BudgetPage() {
   }, [openSpend]);
   const addSpend = async () => {
     if (!active || !sAmount) return;
+    const resolvedPaymentMethod = sPayment
+      ? (paymentMethodOptions.find((p) => p.value === sPayment)?.label ?? sPayment)
+      : null;
     if (sIsCredit) {
       const creditLabel = CREDIT_CATEGORIES.find((c) => c.value === sCreditCategory)?.label ?? sCreditCategory;
       const notesValue = [`[CREDIT] ${creditLabel}`, sNotes].filter(Boolean).join(" — ").trim() || `[CREDIT] ${creditLabel}`;
@@ -213,7 +217,7 @@ function BudgetPage() {
         member_id: sMember || null,
         category: "other" as any,
         notes: notesValue,
-        payment_method: sPayment || null,
+        payment_method: resolvedPaymentMethod,
         spent_at: sDate,
         spent_local_date: sDate,
         user_timezone: tz,
@@ -232,7 +236,7 @@ function BudgetPage() {
     const { error } = await supabase.from("spending_entries").insert({
       household_id: active.id, amount: Number(sAmount), member_id: sMember || null,
       category: dbCat as any, notes: notesValue,
-      payment_method: sPayment || null,
+      payment_method: resolvedPaymentMethod,
       spent_at: sDate, spent_local_date: sDate, user_timezone: tz,
     } as any);
     if (error) return toast.error(error.message);
@@ -497,18 +501,33 @@ function BudgetPage() {
   }, [spending, monthStart]);
 
   const catBreakdown = useMemo(() => {
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
-    const cutoffIso = cutoff.toISOString().slice(0, 10);
     const map = new Map<string, number>();
-    for (const s of spending) {
-      if (localDate(s) < cutoffIso) continue;
+    for (const s of pureVariableSpending) {
+      const d = s.spent_local_date || s.spent_at;
+      if (d < monthStart || d > today) continue;
       map.set(s.category, (map.get(s.category) ?? 0) + s.amount);
     }
     return Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
-      .map(([k, v]) => ({ key: k, label: SPENDING_CATEGORIES.find((c) => c.value === k)?.label ?? k, value: v }));
-  }, [spending]);
+      .map(([k, v]) => ({
+        key: k,
+        label: allCategories.find((c) => c.value === k)?.label ?? k,
+        value: v,
+      }));
+  }, [pureVariableSpending, monthStart, today, allCategories]);
   const catMax = Math.max(1, ...catBreakdown.map((c) => c.value));
+
+  const PAYMENT_ACCOUNT_CATEGORIES = ["checking", "savings", "credit_card"];
+  const paymentMethodOptions = useMemo(() => {
+    return accounts
+      .filter((a) => PAYMENT_ACCOUNT_CATEGORIES.includes(a.category) && a.is_active)
+      .map((a) => ({
+        value: a.id,
+        label: a.institution ? `${a.name} — ${a.institution}` : a.name,
+        category: a.category,
+      }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts]);
 
   return (
     <div className="space-y-6">
@@ -717,7 +736,32 @@ function BudgetPage() {
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5"><Label>Payment method</Label><Input value={sPayment} onChange={(e) => setSPayment(e.target.value)} placeholder="Card, cash..." /></div>
+                  <div className="space-y-1.5">
+                    <Label>Payment method</Label>
+                    <Select value={sPayment || "none"} onValueChange={(v) => setSPayment(v === "none" ? "" : v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select account..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— Not specified —</SelectItem>
+                        {paymentMethodOptions.map((p) => (
+                          <SelectItem key={p.value} value={p.value}>
+                            <span className="inline-flex items-center gap-2">
+                              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                {p.category === "credit_card" ? "CC" : p.category === "checking" ? "CHK" : "SAV"}
+                              </span>
+                              {p.label}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {paymentMethodOptions.length === 0 && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Add checking, savings, or credit card accounts to enable payment tracking.
+                      </p>
+                    )}
+                  </div>
                   <div className="space-y-1.5"><Label>Notes</Label><Input value={sNotes} onChange={(e) => setSNotes(e.target.value)} placeholder="optional" /></div>
                 </div>
               </div>
@@ -933,7 +977,12 @@ function BudgetPage() {
 
           {/* Category breakdown */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
-            <h3 className="font-display text-lg font-semibold">Spending breakdown (30d)</h3>
+            <div className="flex items-baseline justify-between gap-3">
+              <h3 className="font-display text-lg font-semibold">Spending breakdown</h3>
+              <span className="text-xs text-muted-foreground">
+                {new Date(monthStart + "T12:00:00").toLocaleString("default", { month: "long", year: "numeric" })}
+              </span>
+            </div>
             {catBreakdown.length === 0 ? (
               <div className="py-6 text-center text-sm text-muted-foreground">Nothing logged yet.</div>
             ) : (
@@ -955,6 +1004,24 @@ function BudgetPage() {
                         {catBreakdown.map((_, i) => (
                           <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                         ))}
+                        <RechartsLabel
+                          position="center"
+                          content={({ viewBox }) => {
+                            if (!viewBox || !("cx" in viewBox)) return null;
+                            const { cx, cy } = viewBox as { cx: number; cy: number };
+                            const total = catBreakdown.reduce((s, c) => s + c.value, 0);
+                            return (
+                              <g>
+                                <text x={cx} y={cy - 8} textAnchor="middle" className="fill-muted-foreground" style={{ fontSize: 11 }}>
+                                  Total
+                                </text>
+                                <text x={cx} y={cy + 12} textAnchor="middle" className="fill-foreground" style={{ fontSize: 16, fontWeight: 600 }}>
+                                  {fmtMoney(total)}
+                                </text>
+                              </g>
+                            );
+                          }}
+                        />
                       </Pie>
                       <RechartsTooltip
                         contentStyle={CHART_TOOLTIP_STYLE}
@@ -1016,7 +1083,31 @@ function BudgetPage() {
                           </Select>
                         </div>
                         <div className="space-y-1"><Label className="text-xs">Payment</Label>
-                          <Input value={(editDraft.payment_method as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, payment_method: e.target.value })} />
+                          {paymentMethodOptions.length > 0 ? (
+                            <Select
+                              value={paymentMethodOptions.find((p) => p.label === editDraft.payment_method)?.value || "none"}
+                              onValueChange={(v) => {
+                                const resolved = v === "none"
+                                  ? null
+                                  : (paymentMethodOptions.find((p) => p.value === v)?.label ?? null);
+                                setEditDraft({ ...editDraft, payment_method: resolved });
+                              }}
+                            >
+                              <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">— Not specified —</SelectItem>
+                                {paymentMethodOptions.map((p) => (
+                                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input
+                              value={(editDraft.payment_method as string) ?? ""}
+                              onChange={(e) => setEditDraft({ ...editDraft, payment_method: e.target.value })}
+                              placeholder="Payment method"
+                            />
+                          )}
                         </div>
                         <div className="space-y-1"><Label className="text-xs">Notes</Label>
                           <Input value={(editDraft.notes as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, notes: e.target.value })} />
