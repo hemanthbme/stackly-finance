@@ -22,6 +22,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 const isFixedEntry = (s: { notes: string | null }) =>
   s.notes?.startsWith("[FIXED]") ?? false;
 
+const isCreditEntry = (s: { notes: string | null }) =>
+  s.notes?.startsWith("[CREDIT]") ?? false;
+
 export const Route = createFileRoute("/_app/dashboard")({
   component: () => (<RequireHousehold><DashboardPage /></RequireHousehold>),
 });
