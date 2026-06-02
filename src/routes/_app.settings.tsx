@@ -156,6 +156,9 @@ function SettingsPage() {
         <p className="mt-2 text-xs text-muted-foreground">We'll email a secure link to {user?.email}.</p>
       </Section>
 
+      {/* Members & invites */}
+      <InviteSection />
+
       {/* Household */}
       <Section title="Household">
         <div className="flex gap-2">
