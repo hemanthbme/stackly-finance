@@ -592,6 +592,14 @@ function BudgetPage() {
                   <div className="space-y-1.5"><Label>Amount ($)</Label><Input inputMode="decimal" value={sAmount} onChange={(e) => setSAmount(e.target.value)} /></div>
                   <div className="space-y-1.5"><Label>Date</Label><Input type="date" value={sDate} onChange={(e) => setSDate(e.target.value)} /></div>
                 </div>
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
+                  <div>
+                    <Label>Fixed expense</Label>
+                    <div className="text-xs text-muted-foreground">
+                      Fixed costs won't count against your daily variable limit
+                    </div>
+                  </div>
+                  <Switch checked={sIsFixed} onCheckedChange={setSIsFixed} />
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5"><Label>Member</Label>
                     <Select value={sMember || "none"} onValueChange={(v) => setSMember(v === "none" ? "" : v)}>
