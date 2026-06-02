@@ -1265,7 +1265,7 @@ function BudgetPage() {
 
           <ForecastEngine
             spending={spending}
-            recurringEntries={recurring}
+            recurringEntries={recurring.map((r) => ({ amount: r.amount, label: r.label }))}
             monthStart={monthStart}
             today={today}
             monthlyLimit={monthlyLimit}
