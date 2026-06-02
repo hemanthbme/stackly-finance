@@ -3,9 +3,11 @@ import { useEffect, useState } from "react";
 import {
   LayoutDashboard, CalendarRange, Wallet, Users, BarChart3, FileBarChart,
   PiggyBank, Settings, LogOut, Menu, X, ChevronDown, PlusCircle, Plug, HelpCircle,
+  Sun, Moon, Monitor,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useHousehold } from "@/lib/household-context";
+import { useProfile } from "@/lib/profile-context";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
