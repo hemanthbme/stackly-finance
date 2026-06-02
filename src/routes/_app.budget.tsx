@@ -187,12 +187,13 @@ function BudgetPage() {
   const [catType, setCatType] = useState<"expense" | "income">("expense");
   const addCategory = async () => {
     if (!active || !catName.trim()) return;
-    const { error } = await supabase.from("transaction_categories" as any).insert({
+    const { data, error } = await supabase.from("transaction_categories" as any).insert({
       household_id: active.id, name: catName.trim(), icon: catIcon || null,
       color: catColor, category_type: catType, is_active: true,
-    } as any);
+    } as any).select().single();
     if (error) return toast.error(error.message);
     setCatName(""); setCatIcon(""); setOpenCat(false); loadAll();
+    if (data && (data as any).id) setSCategory("custom:" + (data as any).id);
     toast.success("Category added");
   };
   const toggleCategory = async (c: CustomCategory) => {
