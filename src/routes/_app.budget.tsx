@@ -51,6 +51,22 @@ const isFixedEntry = (s: { notes: string | null }) =>
 const stripFixedPrefix = (notes: string | null) =>
   notes?.replace(/^\[FIXED\]\s*/, "") ?? "";
 
+const isCreditEntry = (s: { notes: string | null }) =>
+  s.notes?.startsWith("[CREDIT]") ?? false;
+
+const stripCreditPrefix = (notes: string | null) =>
+  notes?.replace(/^\[CREDIT\]\s*/, "") ?? "";
+
+const CREDIT_CATEGORIES = [
+  { value: "return_amazon", label: "Amazon / Online Return" },
+  { value: "return_store", label: "Store Return" },
+  { value: "reimbursement", label: "Work Reimbursement" },
+  { value: "cash_gift", label: "Cash Gift Received" },
+  { value: "sold_item", label: "Sold Item (Facebook, eBay, etc.)" },
+  { value: "cashback", label: "Cashback / Rewards" },
+  { value: "other_credit", label: "Other Credit" },
+];
+
 type Period = "daily" | "weekly" | "monthly";
 type BudgetType = "individual" | "combined";
 
@@ -176,10 +192,37 @@ function BudgetPage() {
   const [sPayment, setSPayment] = useState("");
   const [sDate, setSDate] = useState(today);
   const [sIsFixed, setSIsFixed] = useState(false);
+  const [sIsCredit, setSIsCredit] = useState(false);
+  const [sCreditCategory, setSCreditCategory] = useState("return_amazon");
   useEffect(() => { setSDate(today); }, [today]);
-  useEffect(() => { if (!openSpend) setSIsFixed(false); }, [openSpend]);
+  useEffect(() => {
+    if (!openSpend) {
+      setSIsFixed(false);
+      setSIsCredit(false);
+      setSCreditCategory("return_amazon");
+    }
+  }, [openSpend]);
   const addSpend = async () => {
     if (!active || !sAmount) return;
+    if (sIsCredit) {
+      const creditLabel = CREDIT_CATEGORIES.find((c) => c.value === sCreditCategory)?.label ?? sCreditCategory;
+      const notesValue = [`[CREDIT] ${creditLabel}`, sNotes].filter(Boolean).join(" — ").trim() || `[CREDIT] ${creditLabel}`;
+      const { error } = await supabase.from("spending_entries").insert({
+        household_id: active.id,
+        amount: Math.abs(Number(sAmount)),
+        member_id: sMember || null,
+        category: "other" as any,
+        notes: notesValue,
+        payment_method: sPayment || null,
+        spent_at: sDate,
+        spent_local_date: sDate,
+        user_timezone: tz,
+      } as any);
+      if (error) return toast.error(error.message);
+      setSAmount(""); setSNotes(""); setSPayment(""); setSIsCredit(false); setOpenSpend(false); loadAll();
+      toast.success("Credit logged");
+      return;
+    }
     // Custom categories use the "other" enum + store real name in notes prefix
     const isCustom = sCategory.startsWith("custom:");
     const dbCat = isCustom ? "other" : sCategory;
@@ -259,6 +302,8 @@ function BudgetPage() {
 
   const variableSpending = spending.filter((s) => !isFixedEntry(s));
   const fixedSpending = spending.filter((s) => isFixedEntry(s));
+  const creditSpending = spending.filter((s) => isCreditEntry(s));
+  const pureVariableSpending = variableSpending.filter((s) => !isCreditEntry(s));
 
   const sumWindowFiltered = (entries: typeof spending, start: string, memberFilter?: string | null) =>
     entries
@@ -270,19 +315,26 @@ function BudgetPage() {
       .reduce((sum, x) => sum + x.amount, 0);
 
   const sumWindow = (start: string, memberFilter?: string | null) =>
-    sumWindowFiltered(variableSpending, start, memberFilter);
+    sumWindowFiltered(pureVariableSpending, start, memberFilter);
 
-  const totalVariableToday = sumWindowFiltered(variableSpending, today);
-  const totalVariableWeek = sumWindowFiltered(variableSpending, weekStart);
-  const totalVariableMonth = sumWindowFiltered(variableSpending, monthStart);
+  const totalVariableToday = sumWindowFiltered(pureVariableSpending, today);
+  const totalVariableWeek = sumWindowFiltered(pureVariableSpending, weekStart);
+  const totalVariableMonth = sumWindowFiltered(pureVariableSpending, monthStart);
   const totalFixedToday = sumWindowFiltered(fixedSpending, today);
   const totalFixedWeek = sumWindowFiltered(fixedSpending, weekStart);
   const totalFixedMonth = sumWindowFiltered(fixedSpending, monthStart);
+  const totalCreditsToday = sumWindowFiltered(creditSpending, today);
+  const totalCreditsWeek = sumWindowFiltered(creditSpending, weekStart);
+  const totalCreditsMonth = sumWindowFiltered(creditSpending, monthStart);
+  const creditsCountMonth = creditSpending.filter((s) => {
+    const d = s.spent_local_date || s.spent_at;
+    return d >= monthStart && d <= today;
+  }).length;
   // Back-compat aliases (downstream projection/charts use variable totals)
   const totalToday = totalVariableToday;
   const totalWeek = totalVariableWeek;
   const totalMonth = totalVariableMonth;
-  void totalFixedToday; void totalFixedWeek;
+  void totalFixedToday; void totalFixedWeek; void totalCreditsWeek;
 
   const combinedDaily = budgets.find((b) => b.budget_type === "combined" && b.period === "daily" && b.is_active);
 
@@ -585,21 +637,43 @@ function BudgetPage() {
           <Dialog open={openSpend} onOpenChange={setOpenSpend}>
             <DialogTrigger asChild><Button className="bg-gradient-primary shadow-glow"><Plus className="mr-1 h-4 w-4" />Log spend</Button></DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Log spending</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{sIsCredit ? "Log return or credit" : "Log spending"}</DialogTitle></DialogHeader>
               <div className="grid gap-3">
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
+                  <div>
+                    <Label>Return or credit</Label>
+                    <div className="text-xs text-muted-foreground">
+                      Money coming back to you — returns, reimbursements, cashback
+                    </div>
+                  </div>
+                  <Switch
+                    checked={sIsCredit}
+                    onCheckedChange={(v) => {
+                      setSIsCredit(v);
+                      setSIsFixed(false);
+                    }}
+                  />
+                </div>
+                {sIsCredit && (
+                  <div className="rounded-lg bg-success/10 border border-success/30 px-3 py-2 text-xs text-success font-medium">
+                    💚 This will be logged as money received — it won't reduce your daily spending total
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5"><Label>Amount ($)</Label><Input inputMode="decimal" value={sAmount} onChange={(e) => setSAmount(e.target.value)} /></div>
                   <div className="space-y-1.5"><Label>Date</Label><Input type="date" value={sDate} onChange={(e) => setSDate(e.target.value)} /></div>
                 </div>
-                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
-                  <div>
-                    <Label>Fixed expense</Label>
-                    <div className="text-xs text-muted-foreground">
-                      Fixed costs won't count against your daily variable limit
+                {!sIsCredit && (
+                  <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
+                    <div>
+                      <Label>Fixed expense</Label>
+                      <div className="text-xs text-muted-foreground">
+                        Fixed costs won't count against your daily variable limit
+                      </div>
                     </div>
+                    <Switch checked={sIsFixed} onCheckedChange={setSIsFixed} />
                   </div>
-                  <Switch checked={sIsFixed} onCheckedChange={setSIsFixed} />
-                </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5"><Label>Member</Label>
                     <Select value={sMember || "none"} onValueChange={(v) => setSMember(v === "none" ? "" : v)}>
@@ -610,30 +684,48 @@ function BudgetPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <Label>Category</Label>
-                      <Button variant="ghost" type="button" className="h-auto p-0 text-xs text-primary" onClick={() => { setOpenSpend(false); setOpenCat(true); }}>+ New category</Button>
+                  {sIsCredit ? (
+                    <div className="space-y-1.5">
+                      <Label>Credit type</Label>
+                      <Select value={sCreditCategory} onValueChange={setSCreditCategory}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {CREDIT_CATEGORIES.map((c) => (
+                            <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <Select value={sCategory} onValueChange={setSCategory}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{allCategories.map((c) => (
-                        <SelectItem key={c.value} value={c.value}>
-                          {c.value.startsWith("custom:") && (
-                            <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: c.color ?? "#4f46e5", marginRight: 6 }} />
-                          )}
-                          {c.label}
-                        </SelectItem>
-                      ))}</SelectContent>
-                    </Select>
-                  </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <Label>Category</Label>
+                        <Button variant="ghost" type="button" className="h-auto p-0 text-xs text-primary" onClick={() => { setOpenSpend(false); setOpenCat(true); }}>+ New category</Button>
+                      </div>
+                      <Select value={sCategory} onValueChange={setSCategory}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{allCategories.map((c) => (
+                          <SelectItem key={c.value} value={c.value}>
+                            {c.value.startsWith("custom:") && (
+                              <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: c.color ?? "#4f46e5", marginRight: 6 }} />
+                            )}
+                            {c.label}
+                          </SelectItem>
+                        ))}</SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5"><Label>Payment method</Label><Input value={sPayment} onChange={(e) => setSPayment(e.target.value)} placeholder="Card, cash..." /></div>
                   <div className="space-y-1.5"><Label>Notes</Label><Input value={sNotes} onChange={(e) => setSNotes(e.target.value)} placeholder="optional" /></div>
                 </div>
               </div>
-              <DialogFooter><Button onClick={addSpend} className="bg-gradient-primary">Add</Button></DialogFooter>
+              <DialogFooter>
+                <Button onClick={addSpend} className={sIsCredit ? "bg-success hover:bg-success/90" : "bg-gradient-primary"}>
+                  {sIsCredit ? "Log return" : "Add"}
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
@@ -701,6 +793,18 @@ function BudgetPage() {
                     );
                   })}
                 </div>
+                {(totalCreditsToday > 0 || totalCreditsWeek > 0 || totalCreditsMonth > 0) && (
+                  <div className="border-t border-border pt-3 mt-4">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Credits & returns</span>
+                      <span className="text-success font-medium">+{fmtMoney(totalCreditsMonth)} this month</span>
+                    </div>
+                    <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
+                      {totalCreditsToday > 0 && <span>Today: +{fmtMoney(totalCreditsToday)}</span>}
+                      {totalCreditsWeek > 0 && <span>This week: +{fmtMoney(totalCreditsWeek)}</span>}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {weeklyLimit > 0 && (
@@ -743,6 +847,49 @@ function BudgetPage() {
                             <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Fixed</span>
                             <Button variant="ghost" size="icon" onClick={() => removeSpend(s.id)}><Trash2 className="h-4 w-4" /></Button>
                           </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+
+              {/* Section C — Returns & credits this month */}
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-display text-lg font-semibold">Returns & credits</h3>
+                  <span className="text-sm text-success">
+                    {creditsCountMonth} logged · +{fmtMoney(totalCreditsMonth)} this month
+                  </span>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {(() => {
+                    const monthCredits = creditSpending
+                      .filter((s) => (s.spent_local_date || s.spent_at) >= monthStart)
+                      .sort((a, b) => (b.spent_at || "").localeCompare(a.spent_at || ""));
+                    if (monthCredits.length === 0) {
+                      return <div className="text-sm text-muted-foreground text-center py-6">No returns or credits logged this month.</div>;
+                    }
+                    return monthCredits.map((s) => {
+                      const stripped = stripCreditPrefix(s.notes);
+                      const parts = stripped.split(" — ");
+                      const typeLabel = parts[0] ?? "";
+                      const extraNote = parts.slice(1).join(" — ");
+                      const memberName = members.find((m) => m.id === s.member_id)?.name ?? "Household";
+                      return (
+                        <div key={s.id} className="flex items-center justify-between rounded-lg border border-success/20 bg-success/5 px-3 py-2.5">
+                          <div>
+                            <div className="text-sm font-medium text-success">
+                              +{fmtMoneyExact(s.amount)}
+                              <span className="ml-2 text-xs font-normal text-muted-foreground">· {typeLabel}</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {s.spent_at} · {memberName}{extraNote ? ` · ${extraNote}` : ""}
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="icon" onClick={() => removeSpend(s.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       );
                     });
@@ -882,16 +1029,24 @@ function BudgetPage() {
                     </div>
                   );
                 }
+                const isCredit = isCreditEntry(s);
+                const displayNotes = isCredit ? stripCreditPrefix(s.notes) : stripFixedPrefix(s.notes);
                 return (
-                  <div key={s.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2">
+                  <div key={s.id} className={`flex items-center justify-between rounded-lg border px-3 py-2 ${isCredit ? "border-success/20 bg-success/5" : "border-border bg-muted/20"}`}>
                     <div>
                       <div className="text-sm font-medium flex items-center gap-2">
-                        <span>{fmtMoneyExact(s.amount)} <span className="text-xs text-muted-foreground">· {cat}</span></span>
-                        {isFixedEntry(s) && (
+                        {isCredit ? (
+                          <span className="text-success">+{fmtMoneyExact(s.amount)}</span>
+                        ) : (
+                          <span>{fmtMoneyExact(s.amount)} <span className="text-xs text-muted-foreground">· {cat}</span></span>
+                        )}
+                        {isCredit ? (
+                          <span className="rounded-full bg-success/10 text-success border border-success/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">Credit</span>
+                        ) : isFixedEntry(s) && (
                           <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Fixed</span>
                         )}
                       </div>
-                      <div className="text-xs text-muted-foreground">{s.spent_at} · {m?.name ?? "Household"}{s.payment_method ? ` · ${s.payment_method}` : ""}{(() => { const n = stripFixedPrefix(s.notes); return n ? ` · ${n}` : ""; })()}</div>
+                      <div className="text-xs text-muted-foreground">{s.spent_at} · {m?.name ?? "Household"}{s.payment_method ? ` · ${s.payment_method}` : ""}{displayNotes ? ` · ${displayNotes}` : ""}</div>
                     </div>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" onClick={() => startEdit(s)}><Pencil className="h-4 w-4" /></Button>

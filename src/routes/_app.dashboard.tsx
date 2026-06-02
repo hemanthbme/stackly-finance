@@ -22,6 +22,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 const isFixedEntry = (s: { notes: string | null }) =>
   s.notes?.startsWith("[FIXED]") ?? false;
 
+const isCreditEntry = (s: { notes: string | null }) =>
+  s.notes?.startsWith("[CREDIT]") ?? false;
+
 export const Route = createFileRoute("/_app/dashboard")({
   component: () => (<RequireHousehold><DashboardPage /></RequireHousehold>),
 });
@@ -322,13 +325,17 @@ function DailyBudgetSummary() {
 
   const variableEntries = entries.filter((e) => !isFixedEntry(e));
   const fixedEntries = entries.filter((e) => isFixedEntry(e));
+  const creditEntries = entries.filter((e) => isCreditEntry(e));
+  const pureVariableEntries = variableEntries.filter((e) => !isCreditEntry(e));
   const dateOf = (e: typeof entries[number]) => e.spent_local_date || e.spent_at;
 
-  const totalVariableToday = variableEntries.filter((e) => dateOf(e) === today).reduce((s, e) => s + e.amount, 0);
-  const totalVariableWeek = variableEntries.filter((e) => dateOf(e) >= weekStart && dateOf(e) <= today).reduce((s, e) => s + e.amount, 0);
-  const totalVariableMonth = variableEntries.filter((e) => dateOf(e) >= monthStart && dateOf(e) <= today).reduce((s, e) => s + e.amount, 0);
+  const totalVariableToday = pureVariableEntries.filter((e) => dateOf(e) === today).reduce((s, e) => s + e.amount, 0);
+  const totalVariableWeek = pureVariableEntries.filter((e) => dateOf(e) >= weekStart && dateOf(e) <= today).reduce((s, e) => s + e.amount, 0);
+  const totalVariableMonth = pureVariableEntries.filter((e) => dateOf(e) >= monthStart && dateOf(e) <= today).reduce((s, e) => s + e.amount, 0);
   const totalFixedMonth = fixedEntries.filter((e) => dateOf(e) >= monthStart && dateOf(e) <= today).reduce((s, e) => s + e.amount, 0);
   const fixedCountMonth = fixedEntries.filter((e) => dateOf(e) >= monthStart && dateOf(e) <= today).length;
+  const totalCreditsMonth = creditEntries.filter((e) => dateOf(e) >= monthStart && dateOf(e) <= today).reduce((s, e) => s + e.amount, 0);
+  const creditsCountMonth = creditEntries.filter((e) => dateOf(e) >= monthStart && dateOf(e) <= today).length;
 
   const rows = [
     { label: "Today", spent: totalVariableToday, limit: variableDailyLimit },
@@ -387,6 +394,24 @@ function DailyBudgetSummary() {
             </div>
             <span className="text-sm font-medium">{fmtMoney(totalFixedMonth)}</span>
           </div>
+          {creditsCountMonth > 0 && (
+            <>
+              <div className="border-t border-border my-3" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-success border border-success/20">
+                    Credits
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {creditsCountMonth} {creditsCountMonth === 1 ? "return" : "returns"} this month
+                  </span>
+                </div>
+                <span className="text-sm font-medium text-success">
+                  +{fmtMoney(totalCreditsMonth)}
+                </span>
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
