@@ -710,7 +710,9 @@ function BudgetPage() {
                       </Select>
                     </div>
                   </div>
-                  <Button onClick={addRecurring} className="w-full bg-gradient-primary">Save recurring</Button>
+                  <Button onClick={addRecurring} disabled={addingRecurring} className="w-full bg-gradient-primary">
+                    {addingRecurring ? "Saving…" : "Add recurring"}
+                  </Button>
                 </div>
               </div>
             </DialogContent>
