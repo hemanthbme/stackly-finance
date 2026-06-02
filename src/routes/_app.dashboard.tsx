@@ -1,12 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RequireHousehold } from "@/components/RequireHousehold";
 import { StatCard } from "@/components/StatCard";
 import { useAccounts, useLatestBalances, useMembers, useSnapshots } from "@/lib/data-hooks";
 import { CASH_CATEGORIES, INVESTMENT_CATEGORIES, RETIREMENT_CATEGORIES, fmtMoney, isAsset, isLiability, pctChange } from "@/lib/finance";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Flame, ArrowRight } from "lucide-react";
+import { useHousehold } from "@/lib/household-context";
+import { useProfile } from "@/lib/profile-context";
+import { supabase } from "@/integrations/supabase/client";
+import { Progress } from "@/components/ui/progress";
+import { Link } from "@tanstack/react-router";
+import { todayInTz } from "@/lib/tz";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: () => (<RequireHousehold><DashboardPage /></RequireHousehold>),
