@@ -15,6 +15,7 @@ import { fmtMoney, fmtMoneyExact, SPENDING_CATEGORIES } from "@/lib/finance";
 import { toast } from "sonner";
 import { Plus, Trash2, Sparkles, Flame, TrendingDown, TrendingUp, Pencil, Save, X, Tag } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
+import { ForecastEngine } from "@/components/ForecastEngine";
 import { useProfile } from "@/lib/profile-context";
 import { todayInTz, startOfWeekInTz, startOfMonthInTz } from "@/lib/tz";
 import {
@@ -306,6 +307,20 @@ function BudgetPage() {
       onTrack: monthlyLimit > 0 ? projectedResult >= 0 : null,
     };
   }, [monthStart, today, totalMonth, monthlyLimit]);
+
+  const lastMonthTotal = useMemo(() => {
+    const [yy, mm] = monthStart.split("-").map(Number);
+    const prevMonthStart = mm === 1
+      ? `${yy - 1}-12-01`
+      : `${yy}-${String(mm - 1).padStart(2, "0")}-01`;
+    const prevMonthEnd = `${yy}-${String(mm).padStart(2, "0")}-01`;
+    return spending
+      .filter((s) => {
+        const d = s.spent_local_date || s.spent_at;
+        return d >= prevMonthStart && d < prevMonthEnd;
+      })
+      .reduce((sum, s) => sum + s.amount, 0);
+  }, [spending, monthStart]);
 
   // Projection chart data (full month)
   const projectionChart = useMemo(() => {
@@ -841,6 +856,19 @@ function BudgetPage() {
               <ProjectionChart days={projectionChart} max={chartMax} monthlyLimit={monthlyLimit} />
             )}
           </div>
+
+          <ForecastEngine
+            spending={spending}
+            recurringEntries={recurring}
+            monthStart={monthStart}
+            today={today}
+            monthlyLimit={monthlyLimit}
+            totalMonth={totalMonth}
+            daysElapsed={projection.daysElapsed}
+            daysRemaining={projection.daysRemaining}
+            daysInMonth={projection.daysInMonth}
+            lastMonthTotal={lastMonthTotal}
+          />
 
           {/* Messages */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
