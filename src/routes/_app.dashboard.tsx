@@ -339,6 +339,13 @@ function DailyBudgetSummary() {
           {limit > 0 && (
             <Progress value={pct} className="mt-3 h-2" indicatorClassName={barColor} />
           )}
+          {limit > 0 && (
+            <div className="mt-2 text-xs italic text-muted-foreground">
+              {spent <= limit
+                ? `At this pace — ${fmtMoney(spent * 30)} projected this month`
+                : `Over today's limit — ${fmtMoney(Math.abs(remaining))} to cut back`}
+            </div>
+          )}
           <div className="mt-3 flex items-center justify-between">
             {limit > 0 ? (
               remaining >= 0 ? (
