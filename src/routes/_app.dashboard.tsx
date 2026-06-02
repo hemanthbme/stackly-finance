@@ -19,6 +19,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+const isFixedEntry = (s: { notes: string | null }) =>
+  s.notes?.startsWith("[FIXED]") ?? false;
+
 export const Route = createFileRoute("/_app/dashboard")({
   component: () => (<RequireHousehold><DashboardPage /></RequireHousehold>),
 });
