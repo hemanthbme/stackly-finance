@@ -19,6 +19,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+const isFixedEntry = (s: { notes: string | null }) =>
+  s.notes?.startsWith("[FIXED]") ?? false;
+
 export const Route = createFileRoute("/_app/dashboard")({
   component: () => (<RequireHousehold><DashboardPage /></RequireHousehold>),
 });
@@ -277,7 +280,7 @@ function DailyBudgetSummary() {
   const tz = profile?.user_timezone || "UTC";
   const today = todayInTz(tz);
   const [limit, setLimit] = useState(0);
-  const [spent, setSpent] = useState(0);
+  const [entries, setEntries] = useState<Array<{ amount: number; spent_at: string; spent_local_date: string | null; notes: string | null }>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -287,15 +290,17 @@ function DailyBudgetSummary() {
       setLoading(true);
       const [budgetsRes, entriesRes] = await Promise.all([
         supabase.from("budgets").select("daily_limit,budget_type,period,is_active").eq("household_id", active.id),
-        supabase.from("spending_entries").select("amount,spent_at,spent_local_date").eq("household_id", active.id),
+        supabase.from("spending_entries").select("amount,spent_at,spent_local_date,notes").eq("household_id", active.id),
       ]);
       if (cancelled) return;
       const b = (budgetsRes.data ?? []).find((x: any) => x.budget_type === "combined" && x.period === "daily" && x.is_active);
       setLimit(b ? Number(b.daily_limit) : 0);
-      const total = (entriesRes.data ?? [])
-        .filter((e: any) => (e.spent_local_date || e.spent_at) === today)
-        .reduce((s: number, e: any) => s + Number(e.amount), 0);
-      setSpent(total);
+      setEntries((entriesRes.data ?? []).map((e: any) => ({
+        amount: Number(e.amount),
+        spent_at: e.spent_at,
+        spent_local_date: e.spent_local_date,
+        notes: e.notes,
+      })));
       setLoading(false);
     }
     load();
@@ -304,57 +309,83 @@ function DailyBudgetSummary() {
 
   if (!active) return null;
 
-  const remaining = limit - spent;
-  const pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
-  const over = limit > 0 && remaining < 0;
-  const close = limit > 0 && !over && pct >= 80;
-  const numberColor = limit > 0
-    ? (over ? "text-destructive" : close ? "text-warning" : "text-success")
-    : "text-foreground";
-  const barColor = over ? "bg-destructive" : close ? "bg-warning" : "bg-success";
+  // Compute week + month starts (Sunday-based week to match defaults)
+  const todayD = new Date(today + "T00:00:00");
+  const dow = todayD.getUTCDay();
+  const wkStartD = new Date(todayD); wkStartD.setUTCDate(todayD.getUTCDate() - dow);
+  const weekStart = wkStartD.toISOString().slice(0, 10);
+  const monthStart = today.slice(0, 7) + "-01";
+
+  const variableDailyLimit = limit;
+  const variableWeeklyLimit = variableDailyLimit * 7;
+  const variableMonthlyLimit = variableDailyLimit * 31;
+
+  const variableEntries = entries.filter((e) => !isFixedEntry(e));
+  const fixedEntries = entries.filter((e) => isFixedEntry(e));
+  const dateOf = (e: typeof entries[number]) => e.spent_local_date || e.spent_at;
+
+  const totalVariableToday = variableEntries.filter((e) => dateOf(e) === today).reduce((s, e) => s + e.amount, 0);
+  const totalVariableWeek = variableEntries.filter((e) => dateOf(e) >= weekStart && dateOf(e) <= today).reduce((s, e) => s + e.amount, 0);
+  const totalVariableMonth = variableEntries.filter((e) => dateOf(e) >= monthStart && dateOf(e) <= today).reduce((s, e) => s + e.amount, 0);
+  const totalFixedMonth = fixedEntries.filter((e) => dateOf(e) >= monthStart && dateOf(e) <= today).reduce((s, e) => s + e.amount, 0);
+  const fixedCountMonth = fixedEntries.filter((e) => dateOf(e) >= monthStart && dateOf(e) <= today).length;
+
+  const rows = [
+    { label: "Today", spent: totalVariableToday, limit: variableDailyLimit },
+    { label: "This week", spent: totalVariableWeek, limit: variableWeeklyLimit },
+    { label: "This month", spent: totalVariableMonth, limit: variableMonthlyLimit },
+  ];
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Flame className="h-4 w-4 text-warning" />
-          <h3 className="font-display text-sm font-semibold">Today's spending</h3>
+          <h3 className="font-display text-sm font-semibold">Budget overview</h3>
         </div>
-        <Link to="/budget" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-          View budget <ArrowRight className="h-3 w-3" />
+        <Link to="/budget" className="flex items-center gap-1 text-sm text-primary hover:underline">
+          Manage <ArrowRight className="h-3 w-3" />
         </Link>
       </div>
       {loading ? (
         <div className="mt-4 text-sm text-muted-foreground">Loading…</div>
+      ) : variableDailyLimit === 0 ? (
+        <div className="mt-4 text-sm text-muted-foreground">
+          No daily budget set — <Link to="/budget" className="text-primary">add one</Link>
+        </div>
       ) : (
         <>
-          <div className={`mt-3 font-display text-3xl font-bold ${numberColor}`}>{fmtMoney(spent)}</div>
-          {limit > 0 ? (
-            <div className="text-sm text-muted-foreground">of {fmtMoney(limit)} daily limit</div>
-          ) : (
-            <div className="text-sm text-muted-foreground">
-              No daily budget set — <Link to="/budget" className="text-primary">add one</Link>
+          <div className="mt-4 space-y-3">
+            {rows.map(({ label, spent, limit: lim }) => {
+              const pct = lim ? Math.min(100, (spent / lim) * 100) : 0;
+              const remaining = lim - spent;
+              const over = remaining < 0;
+              const tone = over ? "destructive" : pct >= 80 ? "warning" : "success";
+              const barColor = tone === "destructive" ? "bg-destructive" : tone === "warning" ? "bg-warning" : "bg-success";
+              const textColor = tone === "destructive" ? "text-destructive" : tone === "warning" ? "text-warning" : "text-success";
+              return (
+                <div key={label}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium">{label}</span>
+                    <span className="text-xs text-muted-foreground">{fmtMoney(spent)} of {fmtMoney(lim)}</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div className={`h-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className={`mt-0.5 text-[11px] font-medium ${textColor}`}>
+                    {over ? `Over by ${fmtMoney(Math.abs(remaining))}` : `${fmtMoney(remaining)} left`}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="border-t border-border my-4" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Fixed</span>
+              <span className="text-sm text-muted-foreground">{fixedCountMonth} logged this month</span>
             </div>
-          )}
-          {limit > 0 && (
-            <Progress value={pct} className="mt-3 h-2" indicatorClassName={barColor} />
-          )}
-          {limit > 0 && (
-            <div className="mt-2 text-xs italic text-muted-foreground">
-              {spent <= limit
-                ? `At this pace — ${fmtMoney(spent * 30)} projected this month`
-                : `Over today's limit — ${fmtMoney(Math.abs(remaining))} to cut back`}
-            </div>
-          )}
-          <div className="mt-3 flex items-center justify-between">
-            {limit > 0 ? (
-              remaining >= 0 ? (
-                <div className="text-sm text-success">{fmtMoney(remaining)} remaining</div>
-              ) : (
-                <div className="text-sm text-destructive">Over by {fmtMoney(Math.abs(remaining))}</div>
-              )
-            ) : <div />}
-            <div className="text-xs text-muted-foreground">{today}</div>
+            <span className="text-sm font-medium">{fmtMoney(totalFixedMonth)}</span>
           </div>
         </>
       )}
