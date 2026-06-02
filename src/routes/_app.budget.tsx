@@ -637,21 +637,43 @@ function BudgetPage() {
           <Dialog open={openSpend} onOpenChange={setOpenSpend}>
             <DialogTrigger asChild><Button className="bg-gradient-primary shadow-glow"><Plus className="mr-1 h-4 w-4" />Log spend</Button></DialogTrigger>
             <DialogContent>
-              <DialogHeader><DialogTitle>Log spending</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{sIsCredit ? "Log return or credit" : "Log spending"}</DialogTitle></DialogHeader>
               <div className="grid gap-3">
+                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
+                  <div>
+                    <Label>Return or credit</Label>
+                    <div className="text-xs text-muted-foreground">
+                      Money coming back to you — returns, reimbursements, cashback
+                    </div>
+                  </div>
+                  <Switch
+                    checked={sIsCredit}
+                    onCheckedChange={(v) => {
+                      setSIsCredit(v);
+                      setSIsFixed(false);
+                    }}
+                  />
+                </div>
+                {sIsCredit && (
+                  <div className="rounded-lg bg-success/10 border border-success/30 px-3 py-2 text-xs text-success font-medium">
+                    💚 This will be logged as money received — it won't reduce your daily spending total
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5"><Label>Amount ($)</Label><Input inputMode="decimal" value={sAmount} onChange={(e) => setSAmount(e.target.value)} /></div>
                   <div className="space-y-1.5"><Label>Date</Label><Input type="date" value={sDate} onChange={(e) => setSDate(e.target.value)} /></div>
                 </div>
-                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
-                  <div>
-                    <Label>Fixed expense</Label>
-                    <div className="text-xs text-muted-foreground">
-                      Fixed costs won't count against your daily variable limit
+                {!sIsCredit && (
+                  <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
+                    <div>
+                      <Label>Fixed expense</Label>
+                      <div className="text-xs text-muted-foreground">
+                        Fixed costs won't count against your daily variable limit
+                      </div>
                     </div>
+                    <Switch checked={sIsFixed} onCheckedChange={setSIsFixed} />
                   </div>
-                  <Switch checked={sIsFixed} onCheckedChange={setSIsFixed} />
-                </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5"><Label>Member</Label>
                     <Select value={sMember || "none"} onValueChange={(v) => setSMember(v === "none" ? "" : v)}>
@@ -662,30 +684,48 @@ function BudgetPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <Label>Category</Label>
-                      <Button variant="ghost" type="button" className="h-auto p-0 text-xs text-primary" onClick={() => { setOpenSpend(false); setOpenCat(true); }}>+ New category</Button>
+                  {sIsCredit ? (
+                    <div className="space-y-1.5">
+                      <Label>Credit type</Label>
+                      <Select value={sCreditCategory} onValueChange={setSCreditCategory}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {CREDIT_CATEGORIES.map((c) => (
+                            <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <Select value={sCategory} onValueChange={setSCategory}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{allCategories.map((c) => (
-                        <SelectItem key={c.value} value={c.value}>
-                          {c.value.startsWith("custom:") && (
-                            <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: c.color ?? "#4f46e5", marginRight: 6 }} />
-                          )}
-                          {c.label}
-                        </SelectItem>
-                      ))}</SelectContent>
-                    </Select>
-                  </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <Label>Category</Label>
+                        <Button variant="ghost" type="button" className="h-auto p-0 text-xs text-primary" onClick={() => { setOpenSpend(false); setOpenCat(true); }}>+ New category</Button>
+                      </div>
+                      <Select value={sCategory} onValueChange={setSCategory}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{allCategories.map((c) => (
+                          <SelectItem key={c.value} value={c.value}>
+                            {c.value.startsWith("custom:") && (
+                              <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: c.color ?? "#4f46e5", marginRight: 6 }} />
+                            )}
+                            {c.label}
+                          </SelectItem>
+                        ))}</SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5"><Label>Payment method</Label><Input value={sPayment} onChange={(e) => setSPayment(e.target.value)} placeholder="Card, cash..." /></div>
                   <div className="space-y-1.5"><Label>Notes</Label><Input value={sNotes} onChange={(e) => setSNotes(e.target.value)} placeholder="optional" /></div>
                 </div>
               </div>
-              <DialogFooter><Button onClick={addSpend} className="bg-gradient-primary">Add</Button></DialogFooter>
+              <DialogFooter>
+                <Button onClick={addSpend} className={sIsCredit ? "bg-success hover:bg-success/90" : "bg-gradient-primary"}>
+                  {sIsCredit ? "Log return" : "Add"}
+                </Button>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
