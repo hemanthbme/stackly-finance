@@ -600,6 +600,7 @@ function BudgetPage() {
                     </div>
                   </div>
                   <Switch checked={sIsFixed} onCheckedChange={setSIsFixed} />
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5"><Label>Member</Label>
                     <Select value={sMember || "none"} onValueChange={(v) => setSMember(v === "none" ? "" : v)}>
