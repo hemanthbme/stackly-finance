@@ -589,6 +589,19 @@ export type Database = {
           user_id: string
         }[]
       }
+      admin_user_summary: {
+        Args: never
+        Returns: {
+          email: string
+          household_id: string
+          household_name: string
+          last_active_at: string
+          member_count: number
+          member_names: string
+          signed_up_at: string
+          user_id: string
+        }[]
+      }
       get_invite_preview: {
         Args: { _token: string }
         Returns: {
