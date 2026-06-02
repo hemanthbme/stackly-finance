@@ -89,6 +89,7 @@ type RecurringEntry = { id: string; label: string; amount: number; category: str
 function BudgetPage() {
   const { active } = useHousehold();
   const { data: members } = useMembers();
+  const { data: accounts } = useAccounts();
   const { profile } = useProfile();
   const tz = profile?.user_timezone || "UTC";
   const weekStartDay = profile?.week_start || "sunday";
