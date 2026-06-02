@@ -736,7 +736,32 @@ function BudgetPage() {
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5"><Label>Payment method</Label><Input value={sPayment} onChange={(e) => setSPayment(e.target.value)} placeholder="Card, cash..." /></div>
+                  <div className="space-y-1.5">
+                    <Label>Payment method</Label>
+                    <Select value={sPayment || "none"} onValueChange={(v) => setSPayment(v === "none" ? "" : v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select account..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— Not specified —</SelectItem>
+                        {paymentMethodOptions.map((p) => (
+                          <SelectItem key={p.value} value={p.value}>
+                            <span className="inline-flex items-center gap-2">
+                              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                {p.category === "credit_card" ? "CC" : p.category === "checking" ? "CHK" : "SAV"}
+                              </span>
+                              {p.label}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {paymentMethodOptions.length === 0 && (
+                      <p className="text-[11px] text-muted-foreground">
+                        Add checking, savings, or credit card accounts to enable payment tracking.
+                      </p>
+                    )}
+                  </div>
                   <div className="space-y-1.5"><Label>Notes</Label><Input value={sNotes} onChange={(e) => setSNotes(e.target.value)} placeholder="optional" /></div>
                 </div>
               </div>
