@@ -83,7 +83,16 @@ interface CustomCategory {
   id: string; name: string; icon: string | null; color: string | null;
   category_type: "expense" | "income"; is_active: boolean;
 }
-type RecurringEntry = { id: string; label: string; amount: number; category: string; memberId: string };
+type RecurringEntry = {
+  id: string;
+  household_id: string;
+  label: string;
+  amount: number;
+  category: string;
+  member_id: string | null;
+  is_active: boolean;
+  created_at: string;
+};
 
 
 function BudgetPage() {
@@ -104,24 +113,66 @@ function BudgetPage() {
   const [openSpend, setOpenSpend] = useState(false);
   const [openCat, setOpenCat] = useState(false);
   const [openRecurring, setOpenRecurring] = useState(false);
-  const [recurring, setRecurring] = useState<RecurringEntry[]>(() => {
-    if (typeof window === "undefined") return [];
-    try { return JSON.parse(localStorage.getItem("stackly:recurring") || "[]"); } catch { return []; }
-  });
-  const persistRecurring = (list: RecurringEntry[]) => {
-    setRecurring(list);
-    if (typeof window !== "undefined") localStorage.setItem("stackly:recurring", JSON.stringify(list));
+  const [recurring, setRecurring] = useState<RecurringEntry[]>([]);
+  const [recurringLoading, setRecurringLoading] = useState(true);
+  const [addingRecurring, setAddingRecurring] = useState(false);
+
+  const loadRecurring = async () => {
+    if (!active) { setRecurringLoading(false); return; }
+    setRecurringLoading(true);
+    const { data, error } = await supabase
+      .from("recurring_entries" as any)
+      .select("*")
+      .eq("household_id", active.id)
+      .eq("is_active", true)
+      .order("created_at");
+    if (!error && data) {
+      setRecurring(
+        (data as any[]).map((r) => ({
+          ...r,
+          amount: Number(r.amount),
+          member_id: r.member_id ?? null,
+        })) as RecurringEntry[]
+      );
+    }
+    setRecurringLoading(false);
   };
+
   const [rLabel, setRLabel] = useState("");
   const [rAmount, setRAmount] = useState("");
   const [rCategory, setRCategory] = useState("food");
   const [rMember, setRMember] = useState("");
-  const addRecurring = () => {
-    if (!rLabel.trim() || !rAmount) return;
-    persistRecurring([...recurring, { id: crypto.randomUUID(), label: rLabel.trim(), amount: Number(rAmount), category: rCategory, memberId: rMember }]);
+
+  const addRecurring = async () => {
+    if (!rLabel.trim() || !rAmount || !active) return;
+    setAddingRecurring(true);
+    const { error } = await supabase
+      .from("recurring_entries" as any)
+      .insert({
+        household_id: active.id,
+        label: rLabel.trim(),
+        amount: Number(rAmount),
+        category: rCategory,
+        member_id: rMember || null,
+        is_active: true,
+      } as any);
+    setAddingRecurring(false);
+    if (error) { toast.error(error.message); return; }
     setRLabel(""); setRAmount(""); setRCategory("food"); setRMember("");
+    toast.success("Recurring entry saved");
+    loadRecurring();
   };
-  const removeRecurring = (id: string) => persistRecurring(recurring.filter((r) => r.id !== id));
+
+  const removeRecurring = async (id: string) => {
+    const { error } = await supabase
+      .from("recurring_entries" as any)
+      .update({ is_active: false } as any)
+      .eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Removed");
+    loadRecurring();
+  };
+
   const logRecurring = async (r: RecurringEntry) => {
     if (!active) return;
     const isCustom = r.category.startsWith("custom:");
@@ -129,7 +180,7 @@ function BudgetPage() {
     const labelPrefix = isCustom ? `[${categoryLabel(r.category)}]` : "";
     const notesValue = [labelPrefix, r.label].filter(Boolean).join(" ").trim() || null;
     const { error } = await supabase.from("spending_entries").insert({
-      household_id: active.id, amount: r.amount, member_id: r.memberId || null,
+      household_id: active.id, amount: r.amount, member_id: r.member_id || null,
       category: dbCat as any, notes: notesValue,
       payment_method: null,
       spent_at: today, spent_local_date: today, user_timezone: tz,
@@ -150,7 +201,11 @@ function BudgetPage() {
     setSpending((s.data ?? []).map((r: any) => ({ ...r, amount: Number(r.amount) })) as Spending[]);
     setCategories(((c.data ?? []) as unknown) as CustomCategory[]);
   };
-  useEffect(() => { loadAll(); /* eslint-disable-next-line */ }, [active?.id]);
+  useEffect(() => {
+    loadAll();
+    loadRecurring();
+    /* eslint-disable-next-line */
+  }, [active?.id]);
 
   // ----- merged categories (built-in + custom active) -----
   const allCategories = useMemo(() => {
@@ -608,15 +663,23 @@ function BudgetPage() {
             <DialogContent>
               <DialogHeader><DialogTitle>Recurring entries</DialogTitle></DialogHeader>
               <div className="space-y-3">
-                {recurring.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No recurring entries yet.</div>
-                ) : (
+                {recurringLoading ? (
                   <div className="space-y-2">
+                    {[1, 2].map((i) => (
+                      <div key={i} className="h-12 animate-pulse rounded-lg bg-muted" />
+                    ))}
+                  </div>
+                ) : recurring.length === 0 ? (
+                  <div className="py-4 text-center text-sm text-muted-foreground">
+                    No recurring entries yet. Add one below.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-auto">
                     {recurring.map((r) => (
                       <div key={r.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 p-2">
                         <div>
                           <div className="text-sm font-medium">{r.label} <span className="text-xs text-muted-foreground">· {fmtMoneyExact(r.amount)}</span></div>
-                          <div className="text-xs text-muted-foreground">{categoryLabel(r.category)}{r.memberId ? " · " + (members.find((m) => m.id === r.memberId)?.name ?? "") : ""}</div>
+                          <div className="text-xs text-muted-foreground">{categoryLabel(r.category)}{r.member_id ? " · " + (members.find((m) => m.id === r.member_id)?.name ?? "") : ""}</div>
                         </div>
                         <div className="flex gap-1">
                           <Button size="sm" variant="outline" onClick={() => logRecurring(r)}>Log now</Button>
@@ -647,7 +710,9 @@ function BudgetPage() {
                       </Select>
                     </div>
                   </div>
-                  <Button onClick={addRecurring} className="w-full bg-gradient-primary">Save recurring</Button>
+                  <Button onClick={addRecurring} disabled={addingRecurring} className="w-full bg-gradient-primary">
+                    {addingRecurring ? "Saving…" : "Add recurring"}
+                  </Button>
                 </div>
               </div>
             </DialogContent>
@@ -1200,7 +1265,7 @@ function BudgetPage() {
 
           <ForecastEngine
             spending={spending}
-            recurringEntries={recurring}
+            recurringEntries={recurring.map((r) => ({ amount: r.amount, label: r.label }))}
             monthStart={monthStart}
             today={today}
             monthlyLimit={monthlyLimit}
