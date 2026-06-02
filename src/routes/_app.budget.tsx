@@ -217,7 +217,7 @@ function BudgetPage() {
         member_id: sMember || null,
         category: "other" as any,
         notes: notesValue,
-        payment_method: sPayment || null,
+        payment_method: resolvedPaymentMethod,
         spent_at: sDate,
         spent_local_date: sDate,
         user_timezone: tz,
@@ -236,7 +236,7 @@ function BudgetPage() {
     const { error } = await supabase.from("spending_entries").insert({
       household_id: active.id, amount: Number(sAmount), member_id: sMember || null,
       category: dbCat as any, notes: notesValue,
-      payment_method: sPayment || null,
+      payment_method: resolvedPaymentMethod,
       spent_at: sDate, spent_local_date: sDate, user_timezone: tz,
     } as any);
     if (error) return toast.error(error.message);
