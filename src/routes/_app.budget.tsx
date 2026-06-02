@@ -51,6 +51,22 @@ const isFixedEntry = (s: { notes: string | null }) =>
 const stripFixedPrefix = (notes: string | null) =>
   notes?.replace(/^\[FIXED\]\s*/, "") ?? "";
 
+const isCreditEntry = (s: { notes: string | null }) =>
+  s.notes?.startsWith("[CREDIT]") ?? false;
+
+const stripCreditPrefix = (notes: string | null) =>
+  notes?.replace(/^\[CREDIT\]\s*/, "") ?? "";
+
+const CREDIT_CATEGORIES = [
+  { value: "return_amazon", label: "Amazon / Online Return" },
+  { value: "return_store", label: "Store Return" },
+  { value: "reimbursement", label: "Work Reimbursement" },
+  { value: "cash_gift", label: "Cash Gift Received" },
+  { value: "sold_item", label: "Sold Item (Facebook, eBay, etc.)" },
+  { value: "cashback", label: "Cashback / Rewards" },
+  { value: "other_credit", label: "Other Credit" },
+];
+
 type Period = "daily" | "weekly" | "monthly";
 type BudgetType = "individual" | "combined";
 
