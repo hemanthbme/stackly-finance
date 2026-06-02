@@ -13,6 +13,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Progress } from "@/components/ui/progress";
 import { Link } from "@tanstack/react-router";
 import { todayInTz } from "@/lib/tz";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: () => (<RequireHousehold><DashboardPage /></RequireHousehold>),
@@ -156,7 +161,113 @@ function DashboardView({ accounts, snapshots }: { accounts: ReturnType<typeof us
       </div>
 
       <DailyBudgetSummary />
+      <GoalsSection net={net} assets={assets} debt={debt} />
     </div>
+  );
+}
+
+type Goal = { id: string; label: string; type: "net_worth" | "savings" | "debt_payoff"; target: number };
+
+function GoalsSection({ net, assets, debt }: { net: number; assets: number; debt: number }) {
+  const [goals, setGoals] = useState<Goal[]>(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(localStorage.getItem("stackly:goals") || "[]"); } catch { return []; }
+  });
+  const [open, setOpen] = useState(false);
+  const [label, setLabel] = useState("");
+  const [type, setType] = useState<Goal["type"]>("net_worth");
+  const [target, setTarget] = useState("");
+
+  const persist = (g: Goal[]) => {
+    setGoals(g);
+    if (typeof window !== "undefined") localStorage.setItem("stackly:goals", JSON.stringify(g));
+  };
+  const addGoal = () => {
+    if (!label.trim() || !target) return;
+    persist([...goals, { id: crypto.randomUUID(), label: label.trim(), type, target: Number(target) }]);
+    setLabel(""); setTarget(""); setType("net_worth"); setOpen(false);
+  };
+  const removeGoal = (id: string) => persist(goals.filter((g) => g.id !== id));
+
+  const currentFor = (t: Goal["type"]) => t === "net_worth" ? net : t === "savings" ? assets : debt;
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
+      <div className="flex items-center justify-between">
+        <h3 className="font-display text-lg font-semibold">Goals</h3>
+        <GoalDialog
+          open={open}
+          onOpenChange={setOpen}
+          label={label}
+          setLabel={setLabel}
+          type={type}
+          setType={setType}
+          target={target}
+          setTarget={setTarget}
+          onAdd={addGoal}
+        />
+      </div>
+      {goals.length === 0 ? (
+        <div className="py-6 text-center text-sm text-muted-foreground">
+          Set a net worth, savings, or debt payoff goal to track your progress.
+        </div>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {goals.map((g) => {
+            const current = currentFor(g.type);
+            const pct = g.target > 0 ? Math.min(100, (current / g.target) * 100) : 0;
+            const reached = current >= g.target;
+            return (
+              <div key={g.id} className="rounded-lg border border-border bg-muted/20 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium text-sm">
+                    {g.label}
+                    {reached && <span className="ml-2 rounded bg-success/20 px-2 py-0.5 text-[10px] font-medium text-success">🎯 Goal reached!</span>}
+                  </div>
+                  <button onClick={() => removeGoal(g.id)} className="text-muted-foreground hover:text-destructive text-xs">Delete</button>
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">{fmtMoney(current)} of {fmtMoney(g.target)}</div>
+                <Progress value={pct} className="mt-2 h-2" indicatorClassName={reached ? "bg-success" : "bg-gradient-primary"} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GoalDialog({ open, onOpenChange, label, setLabel, type, setType, target, setTarget, onAdd }: {
+  open: boolean; onOpenChange: (o: boolean) => void;
+  label: string; setLabel: (v: string) => void;
+  type: Goal["type"]; setType: (v: Goal["type"]) => void;
+  target: string; setTarget: (v: string) => void;
+  onAdd: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTrigger asChild>
+        <button className="text-xs text-primary hover:underline">+ Add goal</button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>New goal</DialogTitle></DialogHeader>
+        <div className="grid gap-3">
+          <div className="space-y-1.5"><Label>Label</Label><Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. $500k net worth" /></div>
+          <div className="space-y-1.5"><Label>Type</Label>
+            <Select value={type} onValueChange={(v) => setType(v as Goal["type"])}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="net_worth">Net worth</SelectItem>
+                <SelectItem value="savings">Savings</SelectItem>
+                <SelectItem value="debt_payoff">Debt payoff</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5"><Label>Target amount ($)</Label><Input inputMode="decimal" value={target} onChange={(e) => setTarget(e.target.value)} /></div>
+        </div>
+        <DialogFooter><Button onClick={onAdd} className="bg-gradient-primary">Add</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

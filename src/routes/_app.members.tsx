@@ -63,7 +63,7 @@ function MembersPage() {
         {data.map((m) => (
           <div key={m.id} className="flex items-center justify-between rounded-2xl border border-border bg-card p-4 shadow-card">
             <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-primary font-display font-bold">{m.name[0]?.toUpperCase()}</div>
+              <div className="grid h-10 w-10 place-items-center rounded-full font-display font-bold" style={{ background: m.color ?? "#4f46e5" }}><span style={{ color: "#fff" }}>{m.name[0]?.toUpperCase()}</span></div>
               <div>
                 <div className="font-medium">{m.name}</div>
                 <div className="text-xs text-muted-foreground">{m.relationship || "household member"}</div>

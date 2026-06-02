@@ -59,6 +59,8 @@ interface CustomCategory {
   id: string; name: string; icon: string | null; color: string | null;
   category_type: "expense" | "income"; is_active: boolean;
 }
+type RecurringEntry = { id: string; label: string; amount: number; category: string; memberId: string };
+
 
 function BudgetPage() {
   const { active } = useHousehold();
@@ -76,6 +78,41 @@ function BudgetPage() {
   const [openBudget, setOpenBudget] = useState(false);
   const [openSpend, setOpenSpend] = useState(false);
   const [openCat, setOpenCat] = useState(false);
+  const [openRecurring, setOpenRecurring] = useState(false);
+  const [recurring, setRecurring] = useState<RecurringEntry[]>(() => {
+    if (typeof window === "undefined") return [];
+    try { return JSON.parse(localStorage.getItem("stackly:recurring") || "[]"); } catch { return []; }
+  });
+  const persistRecurring = (list: RecurringEntry[]) => {
+    setRecurring(list);
+    if (typeof window !== "undefined") localStorage.setItem("stackly:recurring", JSON.stringify(list));
+  };
+  const [rLabel, setRLabel] = useState("");
+  const [rAmount, setRAmount] = useState("");
+  const [rCategory, setRCategory] = useState("food");
+  const [rMember, setRMember] = useState("");
+  const addRecurring = () => {
+    if (!rLabel.trim() || !rAmount) return;
+    persistRecurring([...recurring, { id: crypto.randomUUID(), label: rLabel.trim(), amount: Number(rAmount), category: rCategory, memberId: rMember }]);
+    setRLabel(""); setRAmount(""); setRCategory("food"); setRMember("");
+  };
+  const removeRecurring = (id: string) => persistRecurring(recurring.filter((r) => r.id !== id));
+  const logRecurring = async (r: RecurringEntry) => {
+    if (!active) return;
+    const isCustom = r.category.startsWith("custom:");
+    const dbCat = isCustom ? "other" : r.category;
+    const labelPrefix = isCustom ? `[${categoryLabel(r.category)}]` : "";
+    const notesValue = [labelPrefix, r.label].filter(Boolean).join(" ").trim() || null;
+    const { error } = await supabase.from("spending_entries").insert({
+      household_id: active.id, amount: r.amount, member_id: r.memberId || null,
+      category: dbCat as any, notes: notesValue,
+      payment_method: null,
+      spent_at: today, spent_local_date: today, user_timezone: tz,
+    } as any);
+    if (error) return toast.error(error.message);
+    loadAll();
+    toast.success("Logged: " + r.label);
+  };
 
   const loadAll = async () => {
     if (!active) return;
@@ -187,12 +224,13 @@ function BudgetPage() {
   const [catType, setCatType] = useState<"expense" | "income">("expense");
   const addCategory = async () => {
     if (!active || !catName.trim()) return;
-    const { error } = await supabase.from("transaction_categories" as any).insert({
+    const { data, error } = await supabase.from("transaction_categories" as any).insert({
       household_id: active.id, name: catName.trim(), icon: catIcon || null,
       color: catColor, category_type: catType, is_active: true,
-    } as any);
+    } as any).select().single();
     if (error) return toast.error(error.message);
     setCatName(""); setCatIcon(""); setOpenCat(false); loadAll();
+    if (data && (data as any).id) setSCategory("custom:" + (data as any).id);
     toast.success("Category added");
   };
   const toggleCategory = async (c: CustomCategory) => {
@@ -421,6 +459,57 @@ function BudgetPage() {
               <DialogFooter><Button onClick={addBudget} className="bg-gradient-primary">Create</Button></DialogFooter>
             </DialogContent>
           </Dialog>
+
+          <Dialog open={openRecurring} onOpenChange={setOpenRecurring}>
+            <DialogTrigger asChild><Button variant="outline">Recurring</Button></DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Recurring entries</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                {recurring.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">No recurring entries yet.</div>
+                ) : (
+                  <div className="space-y-2">
+                    {recurring.map((r) => (
+                      <div key={r.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 p-2">
+                        <div>
+                          <div className="text-sm font-medium">{r.label} <span className="text-xs text-muted-foreground">· {fmtMoneyExact(r.amount)}</span></div>
+                          <div className="text-xs text-muted-foreground">{categoryLabel(r.category)}{r.memberId ? " · " + (members.find((m) => m.id === r.memberId)?.name ?? "") : ""}</div>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="outline" onClick={() => logRecurring(r)}>Log now</Button>
+                          <Button size="sm" variant="ghost" onClick={() => removeRecurring(r.id)}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="border-t border-border pt-3 space-y-2">
+                  <div className="text-xs font-medium text-muted-foreground">Add new</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1"><Label className="text-xs">Label</Label><Input value={rLabel} onChange={(e) => setRLabel(e.target.value)} placeholder="Netflix" /></div>
+                    <div className="space-y-1"><Label className="text-xs">Amount</Label><Input inputMode="decimal" value={rAmount} onChange={(e) => setRAmount(e.target.value)} /></div>
+                    <div className="space-y-1"><Label className="text-xs">Category</Label>
+                      <Select value={rCategory} onValueChange={setRCategory}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{allCategories.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1"><Label className="text-xs">Member</Label>
+                      <Select value={rMember || "none"} onValueChange={(v) => setRMember(v === "none" ? "" : v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Household</SelectItem>
+                          {members.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <Button onClick={addRecurring} className="w-full bg-gradient-primary">Save recurring</Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={openSpend} onOpenChange={setOpenSpend}>
             <DialogTrigger asChild><Button className="bg-gradient-primary shadow-glow"><Plus className="mr-1 h-4 w-4" />Log spend</Button></DialogTrigger>
             <DialogContent>
@@ -440,10 +529,21 @@ function BudgetPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1.5"><Label>Category</Label>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label>Category</Label>
+                      <Button variant="ghost" type="button" className="h-auto p-0 text-xs text-primary" onClick={() => { setOpenSpend(false); setOpenCat(true); }}>+ New category</Button>
+                    </div>
                     <Select value={sCategory} onValueChange={setSCategory}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{allCategories.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                      <SelectContent>{allCategories.map((c) => (
+                        <SelectItem key={c.value} value={c.value}>
+                          {c.value.startsWith("custom:") && (
+                            <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: c.color ?? "#4f46e5", marginRight: 6 }} />
+                          )}
+                          {c.label}
+                        </SelectItem>
+                      ))}</SelectContent>
                     </Select>
                   </div>
                 </div>
@@ -517,7 +617,7 @@ function BudgetPage() {
                 return (
                   <div key={member.id} className="rounded-2xl border border-border bg-card p-5 shadow-card">
                     <div className="flex items-center gap-3">
-                      <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-primary font-display font-bold">{member.name[0]?.toUpperCase()}</div>
+                      <div className="grid h-10 w-10 place-items-center rounded-full font-display font-bold" style={{ background: member.color ?? "#4f46e5" }}>{member.name[0]?.toUpperCase()}</div>
                       <div className="flex-1">
                         <div className="text-xs uppercase tracking-wider text-muted-foreground">{member.name} · {period}</div>
                         <div className="font-display text-xl font-bold">{fmtMoney(spent)}{hasBudget && <span className="ml-1 text-xs font-normal text-muted-foreground">of {fmtMoney(limit)}</span>}</div>
