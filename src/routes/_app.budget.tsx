@@ -853,6 +853,49 @@ function BudgetPage() {
                   })()}
                 </div>
               </div>
+
+              {/* Section C — Returns & credits this month */}
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-display text-lg font-semibold">Returns & credits</h3>
+                  <span className="text-sm text-success">
+                    {creditsCountMonth} logged · +{fmtMoney(totalCreditsMonth)} this month
+                  </span>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {(() => {
+                    const monthCredits = creditSpending
+                      .filter((s) => (s.spent_local_date || s.spent_at) >= monthStart)
+                      .sort((a, b) => (b.spent_at || "").localeCompare(a.spent_at || ""));
+                    if (monthCredits.length === 0) {
+                      return <div className="text-sm text-muted-foreground text-center py-6">No returns or credits logged this month.</div>;
+                    }
+                    return monthCredits.map((s) => {
+                      const stripped = stripCreditPrefix(s.notes);
+                      const parts = stripped.split(" — ");
+                      const typeLabel = parts[0] ?? "";
+                      const extraNote = parts.slice(1).join(" — ");
+                      const memberName = members.find((m) => m.id === s.member_id)?.name ?? "Household";
+                      return (
+                        <div key={s.id} className="flex items-center justify-between rounded-lg border border-success/20 bg-success/5 px-3 py-2.5">
+                          <div>
+                            <div className="text-sm font-medium text-success">
+                              +{fmtMoneyExact(s.amount)}
+                              <span className="ml-2 text-xs font-normal text-muted-foreground">· {typeLabel}</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {s.spent_at} · {memberName}{extraNote ? ` · ${extraNote}` : ""}
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="icon" onClick={() => removeSpend(s.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
             </>
           )}
 
