@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
 
 const isFixedEntry = (s: { notes: string | null }) =>
   s.notes?.startsWith("[FIXED]") ?? false;
@@ -172,30 +173,81 @@ function DashboardView({ accounts, snapshots }: { accounts: ReturnType<typeof us
   );
 }
 
-type Goal = { id: string; label: string; type: "net_worth" | "savings" | "debt_payoff"; target: number };
+type Goal = {
+  id: string;
+  household_id: string;
+  label: string;
+  type: "net_worth" | "savings" | "debt_payoff";
+  target: number;
+  created_at: string;
+};
 
 function GoalsSection({ net, assets, debt }: { net: number; assets: number; debt: number }) {
-  const [goals, setGoals] = useState<Goal[]>(() => {
-    if (typeof window === "undefined") return [];
-    try { return JSON.parse(localStorage.getItem("stackly:goals") || "[]"); } catch { return []; }
-  });
+  const { active } = useHousehold();
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState("");
   const [type, setType] = useState<Goal["type"]>("net_worth");
   const [target, setTarget] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const persist = (g: Goal[]) => {
-    setGoals(g);
-    if (typeof window !== "undefined") localStorage.setItem("stackly:goals", JSON.stringify(g));
+  const loadGoals = async () => {
+    if (!active) { setLoading(false); return; }
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("household_goals" as any)
+      .select("*")
+      .eq("household_id", active.id)
+      .order("created_at");
+    if (!error && data) {
+      setGoals(
+        (data as any[]).map((g) => ({
+          ...g,
+          target: Number(g.target),
+        })) as Goal[]
+      );
+    }
+    setLoading(false);
   };
-  const addGoal = () => {
-    if (!label.trim() || !target) return;
-    persist([...goals, { id: crypto.randomUUID(), label: label.trim(), type, target: Number(target) }]);
+
+  useEffect(() => {
+    loadGoals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active?.id]);
+
+  const addGoal = async () => {
+    if (!label.trim() || !target || !active) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("household_goals" as any)
+      .insert({
+        household_id: active.id,
+        label: label.trim(),
+        type,
+        target: Number(target),
+      } as any);
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Goal added");
     setLabel(""); setTarget(""); setType("net_worth"); setOpen(false);
+    loadGoals();
   };
-  const removeGoal = (id: string) => persist(goals.filter((g) => g.id !== id));
 
-  const currentFor = (t: Goal["type"]) => t === "net_worth" ? net : t === "savings" ? assets : debt;
+  const removeGoal = async (id: string) => {
+    const { error } = await supabase
+      .from("household_goals" as any)
+      .delete()
+      .eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Goal removed");
+    loadGoals();
+  };
+
+  const currentFor = (t: Goal["type"]) =>
+    t === "net_worth" ? net : t === "savings" ? assets : debt;
+
+  if (!active) return null;
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
@@ -211,9 +263,17 @@ function GoalsSection({ net, assets, debt }: { net: number; assets: number; debt
           target={target}
           setTarget={setTarget}
           onAdd={addGoal}
+          saving={saving}
         />
       </div>
-      {goals.length === 0 ? (
+
+      {loading ? (
+        <div className="mt-4 space-y-3">
+          {[1, 2].map((i) => (
+            <div key={i} className="h-16 animate-pulse rounded-lg bg-muted/40" />
+          ))}
+        </div>
+      ) : goals.length === 0 ? (
         <div className="py-6 text-center text-sm text-muted-foreground">
           Set a net worth, savings, or debt payoff goal to track your progress.
         </div>
@@ -223,16 +283,35 @@ function GoalsSection({ net, assets, debt }: { net: number; assets: number; debt
             const current = currentFor(g.type);
             const pct = g.target > 0 ? Math.min(100, (current / g.target) * 100) : 0;
             const reached = current >= g.target;
+            const typeLabel =
+              g.type === "net_worth" ? "Net worth"
+              : g.type === "savings" ? "Savings"
+              : "Debt payoff";
             return (
               <div key={g.id} className="rounded-lg border border-border bg-muted/20 p-3">
                 <div className="flex items-center justify-between">
                   <div className="font-medium text-sm">
                     {g.label}
-                    {reached && <span className="ml-2 rounded bg-success/20 px-2 py-0.5 text-[10px] font-medium text-success">🎯 Goal reached!</span>}
+                    {reached && (
+                      <span className="ml-2 rounded bg-success/20 px-2 py-0.5 text-[10px] font-medium text-success">
+                        🎯 Goal reached!
+                      </span>
+                    )}
                   </div>
-                  <button onClick={() => removeGoal(g.id)} className="text-muted-foreground hover:text-destructive text-xs">Delete</button>
+                  <button
+                    onClick={() => removeGoal(g.id)}
+                    className="text-muted-foreground hover:text-destructive text-xs transition-colors"
+                  >
+                    Delete
+                  </button>
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">{fmtMoney(current)} of {fmtMoney(g.target)}</div>
+                <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide">
+                    {typeLabel}
+                  </span>
+                  <span>{fmtMoney(current)} of {fmtMoney(g.target)}</span>
+                  <span className="ml-auto">{Math.round(pct)}%</span>
+                </div>
                 <Progress value={pct} className="mt-2 h-2" indicatorClassName={reached ? "bg-success" : "bg-gradient-primary"} />
               </div>
             );
@@ -243,12 +322,16 @@ function GoalsSection({ net, assets, debt }: { net: number; assets: number; debt
   );
 }
 
-function GoalDialog({ open, onOpenChange, label, setLabel, type, setType, target, setTarget, onAdd }: {
+function GoalDialog({
+  open, onOpenChange, label, setLabel, type, setType,
+  target, setTarget, onAdd, saving,
+}: {
   open: boolean; onOpenChange: (o: boolean) => void;
   label: string; setLabel: (v: string) => void;
   type: Goal["type"]; setType: (v: Goal["type"]) => void;
   target: string; setTarget: (v: string) => void;
   onAdd: () => void;
+  saving: boolean;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -258,8 +341,12 @@ function GoalDialog({ open, onOpenChange, label, setLabel, type, setType, target
       <DialogContent>
         <DialogHeader><DialogTitle>New goal</DialogTitle></DialogHeader>
         <div className="grid gap-3">
-          <div className="space-y-1.5"><Label>Label</Label><Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. $500k net worth" /></div>
-          <div className="space-y-1.5"><Label>Type</Label>
+          <div className="space-y-1.5">
+            <Label>Label</Label>
+            <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. $500k net worth" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Type</Label>
             <Select value={type} onValueChange={(v) => setType(v as Goal["type"])}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -269,9 +356,16 @@ function GoalDialog({ open, onOpenChange, label, setLabel, type, setType, target
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5"><Label>Target amount ($)</Label><Input inputMode="decimal" value={target} onChange={(e) => setTarget(e.target.value)} /></div>
+          <div className="space-y-1.5">
+            <Label>Target amount ($)</Label>
+            <Input inputMode="decimal" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="500000" />
+          </div>
         </div>
-        <DialogFooter><Button onClick={onAdd} className="bg-gradient-primary">Add</Button></DialogFooter>
+        <DialogFooter>
+          <Button onClick={onAdd} disabled={saving} className="bg-gradient-primary">
+            {saving ? "Saving…" : "Add goal"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
