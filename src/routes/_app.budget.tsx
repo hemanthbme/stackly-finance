@@ -662,11 +662,46 @@ function BudgetPage() {
         <TabsContent value="overview" className="space-y-6">
           {showCombinedCards && (
             <>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <StatCard label="Spent today" value={fmtMoney(totalToday)} icon={<Flame className="h-4 w-4 text-warning" />} />
-                <PeriodCard data={dCard} />
-                <StatCard label="Spent this week" value={fmtMoney(totalWeek)} />
-                <PeriodCard data={wCard} />
+              {/* Section A — Variable spending trackers */}
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-display text-lg font-semibold">Variable spending</h3>
+                  {variableDailyLimit > 0 ? (
+                    <span className="text-sm text-muted-foreground">{fmtMoney(variableDailyLimit)}/day</span>
+                  ) : (
+                    <button onClick={() => setOpenBudget(true)} className="text-sm text-primary hover:underline">Set a daily limit</button>
+                  )}
+                </div>
+                <div className="space-y-4 mt-4">
+                  {[
+                    { label: "Today", spent: totalVariableToday, limit: variableDailyLimit },
+                    { label: "This week", spent: totalVariableWeek, limit: variableWeeklyLimit },
+                    { label: "This month", spent: totalVariableMonth, limit: variableMonthlyLimit },
+                  ].map(({ label, spent, limit }) => {
+                    const pct = limit ? Math.min(100, (spent / limit) * 100) : 0;
+                    const remaining = limit - spent;
+                    const over = remaining < 0;
+                    const tone = !limit ? "default" : over ? "destructive" : pct >= 80 ? "warning" : "success";
+                    const barColor = tone === "destructive" ? "bg-destructive" : tone === "warning" ? "bg-warning" : tone === "success" ? "bg-success" : "bg-muted-foreground";
+                    const textColor = tone === "destructive" ? "text-destructive" : tone === "warning" ? "text-warning" : tone === "success" ? "text-success" : "text-muted-foreground";
+                    return (
+                      <div key={label}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-sm font-medium">{label}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {fmtMoney(spent)} of {limit ? fmtMoney(limit) : "—"}
+                          </span>
+                        </div>
+                        <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                          <div className={`h-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <div className={`mt-1 text-xs font-medium ${textColor}`}>
+                          {!limit ? "No limit set" : over ? `Over by ${fmtMoney(Math.abs(remaining))}` : `${fmtMoney(remaining)} left`}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {weeklyLimit > 0 && (
@@ -678,26 +713,42 @@ function BudgetPage() {
                 </div>
               )}
 
-
-
-
-              {/* Combined month spend display */}
+              {/* Section B — Fixed expenses this month */}
               <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <div className="font-display text-xl font-bold">
-                    {fmtMoney(totalMonth)} <span className="text-muted-foreground">of {monthlyLimit ? fmtMoney(monthlyLimit) : "—"} spent this month</span>
-                  </div>
-                  {monthlyLimit > 0 && (
-                    <div className="text-sm text-muted-foreground">
-                      {Math.round(mCard.pct)}% used · {mCard.remaining >= 0 ? `${fmtMoney(mCard.remaining)} left` : `${fmtMoney(Math.abs(mCard.remaining))} over`}
-                    </div>
-                  )}
+                <div className="flex items-center justify-between">
+                  <h3 className="font-display text-lg font-semibold">Fixed expenses</h3>
+                  <span className="text-sm text-muted-foreground">
+                    {fixedSpending.filter((s) => (s.spent_local_date || s.spent_at) >= monthStart).length} logged · {fmtMoney(totalFixedMonth)} this month
+                  </span>
                 </div>
-                {monthlyLimit > 0 && (
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
-                    <div className={`h-full transition-all ${mCard.tone === "destructive" ? "bg-destructive" : mCard.tone === "warning" ? "bg-warning" : "bg-success"}`} style={{ width: `${Math.min(100, mCard.pct)}%` }} />
-                  </div>
-                )}
+                <div className="mt-4 space-y-2">
+                  {(() => {
+                    const monthFixed = fixedSpending
+                      .filter((s) => (s.spent_local_date || s.spent_at) >= monthStart)
+                      .sort((a, b) => (b.spent_at || "").localeCompare(a.spent_at || ""));
+                    if (monthFixed.length === 0) {
+                      return <div className="text-sm text-muted-foreground text-center py-6">No fixed expenses logged this month.</div>;
+                    }
+                    return monthFixed.map((s) => {
+                      const strippedNotes = stripFixedPrefix(s.notes);
+                      const memberName = members.find((m) => m.id === s.member_id)?.name ?? "Household";
+                      return (
+                        <div key={s.id} className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2.5">
+                          <div>
+                            <div className="text-sm font-medium">{categoryLabel(s.category)} · {fmtMoneyExact(s.amount)}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {s.spent_at} · {memberName}{strippedNotes ? ` · ${strippedNotes}` : ""}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Fixed</span>
+                            <Button variant="ghost" size="icon" onClick={() => removeSpend(s.id)}><Trash2 className="h-4 w-4" /></Button>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
               </div>
             </>
           )}
