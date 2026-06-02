@@ -236,6 +236,44 @@ export type Database = {
         }
         Relationships: []
       }
+      household_goals: {
+        Row: {
+          created_at: string
+          created_by: string
+          household_id: string
+          id: string
+          label: string
+          target: number
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          household_id: string
+          id?: string
+          label: string
+          target: number
+          type: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          household_id?: string
+          id?: string
+          label?: string
+          target?: number
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "household_goals_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       household_invites: {
         Row: {
           accepted_at: string | null
