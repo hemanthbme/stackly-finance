@@ -615,19 +615,14 @@ function BudgetPage() {
                 <PeriodCard data={wCard} />
               </div>
 
-              {weeklyLimit > 0 && (() => {
-                const pace = weeklyPaceStatus === "on_track"
-                  ? { icon: "✅", label: "On track", color: "text-success" }
-                  : weeklyPaceStatus === "slightly_ahead"
-                  ? { icon: "⚠️", label: "Slightly ahead of pace", color: "text-warning" }
-                  : { icon: "🚨", label: "Overpacing this week", color: "text-destructive" };
-                return (
-                  <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm shadow-card">
-                    <span className="font-medium text-muted-foreground">Weekly pace</span>
-                    <span className={`ml-auto font-medium ${pace.color}`}>{pace.icon} {pace.label}</span>
-                  </div>
-                );
-              })()}
+              {weeklyLimit > 0 && (
+                <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm shadow-card">
+                  <span className="font-medium text-muted-foreground">Weekly pace</span>
+                  <span className={`ml-auto font-medium ${weeklyPaceStatus === "on_track" ? "text-success" : weeklyPaceStatus === "slightly_ahead" ? "text-warning" : "text-destructive"}`}>
+                    {weeklyPaceStatus === "on_track" ? "✅ On track" : weeklyPaceStatus === "slightly_ahead" ? "⚠️ Slightly ahead of pace" : "🚨 Overpacing this week"}
+                  </span>
+                </div>
+              )}
 
 
 
