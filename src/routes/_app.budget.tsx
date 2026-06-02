@@ -793,6 +793,18 @@ function BudgetPage() {
                     );
                   })}
                 </div>
+                {(totalCreditsToday > 0 || totalCreditsWeek > 0 || totalCreditsMonth > 0) && (
+                  <div className="border-t border-border pt-3 mt-4">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Credits & returns</span>
+                      <span className="text-success font-medium">+{fmtMoney(totalCreditsMonth)} this month</span>
+                    </div>
+                    <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
+                      {totalCreditsToday > 0 && <span>Today: +{fmtMoney(totalCreditsToday)}</span>}
+                      {totalCreditsWeek > 0 && <span>This week: +{fmtMoney(totalCreditsWeek)}</span>}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {weeklyLimit > 0 && (
