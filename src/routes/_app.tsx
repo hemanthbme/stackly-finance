@@ -99,7 +99,8 @@ function AppShell() {
         <header className="flex h-16 items-center justify-between border-b border-border px-4 md:px-8">
           <button className="md:hidden" onClick={() => setMobileOpen(true)}><Menu className="h-5 w-5" /></button>
           <div className="flex-1" />
-          <div className="text-sm text-muted-foreground">{user.email}</div>
+          <ThemeToggle />
+          <div className="ml-3 text-sm text-muted-foreground">{user.email}</div>
         </header>
         <main className="flex-1 overflow-auto p-4 md:p-8">
           <Outlet />
