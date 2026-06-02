@@ -1,12 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RequireHousehold } from "@/components/RequireHousehold";
 import { StatCard } from "@/components/StatCard";
 import { useAccounts, useLatestBalances, useMembers, useSnapshots } from "@/lib/data-hooks";
 import { CASH_CATEGORIES, INVESTMENT_CATEGORIES, RETIREMENT_CATEGORIES, fmtMoney, isAsset, isLiability, pctChange } from "@/lib/finance";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Flame, ArrowRight } from "lucide-react";
+import { useHousehold } from "@/lib/household-context";
+import { useProfile } from "@/lib/profile-context";
+import { supabase } from "@/integrations/supabase/client";
+import { Progress } from "@/components/ui/progress";
+import { Link } from "@tanstack/react-router";
+import { todayInTz } from "@/lib/tz";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: () => (<RequireHousehold><DashboardPage /></RequireHousehold>),
@@ -155,6 +161,85 @@ function DashboardView({ accounts, snapshots }: { accounts: ReturnType<typeof us
 }
 
 function DailyBudgetSummary() {
-  // Pulled into dashboard for quick view
-  return null;
+  const { active } = useHousehold();
+  const { profile } = useProfile();
+  const tz = profile?.user_timezone || "UTC";
+  const today = todayInTz(tz);
+  const [limit, setLimit] = useState(0);
+  const [spent, setSpent] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!active) return;
+      setLoading(true);
+      const [budgetsRes, entriesRes] = await Promise.all([
+        supabase.from("budgets").select("daily_limit,budget_type,period,is_active").eq("household_id", active.id),
+        supabase.from("spending_entries").select("amount,spent_at,spent_local_date").eq("household_id", active.id),
+      ]);
+      if (cancelled) return;
+      const b = (budgetsRes.data ?? []).find((x: any) => x.budget_type === "combined" && x.period === "daily" && x.is_active);
+      setLimit(b ? Number(b.daily_limit) : 0);
+      const total = (entriesRes.data ?? [])
+        .filter((e: any) => (e.spent_local_date || e.spent_at) === today)
+        .reduce((s: number, e: any) => s + Number(e.amount), 0);
+      setSpent(total);
+      setLoading(false);
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [active?.id, today]);
+
+  if (!active) return null;
+
+  const remaining = limit - spent;
+  const pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
+  const over = limit > 0 && remaining < 0;
+  const close = limit > 0 && !over && pct >= 80;
+  const numberColor = limit > 0
+    ? (over ? "text-destructive" : close ? "text-warning" : "text-success")
+    : "text-foreground";
+  const barColor = over ? "bg-destructive" : close ? "bg-warning" : "bg-success";
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Flame className="h-4 w-4 text-warning" />
+          <h3 className="font-display text-sm font-semibold">Today's spending</h3>
+        </div>
+        <Link to="/budget" className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+          View budget <ArrowRight className="h-3 w-3" />
+        </Link>
+      </div>
+      {loading ? (
+        <div className="mt-4 text-sm text-muted-foreground">Loading…</div>
+      ) : (
+        <>
+          <div className={`mt-3 font-display text-3xl font-bold ${numberColor}`}>{fmtMoney(spent)}</div>
+          {limit > 0 ? (
+            <div className="text-sm text-muted-foreground">of {fmtMoney(limit)} daily limit</div>
+          ) : (
+            <div className="text-sm text-muted-foreground">
+              No daily budget set — <Link to="/budget" className="text-primary">add one</Link>
+            </div>
+          )}
+          {limit > 0 && (
+            <Progress value={pct} className="mt-3 h-2" indicatorClassName={barColor} />
+          )}
+          <div className="mt-3 flex items-center justify-between">
+            {limit > 0 ? (
+              remaining >= 0 ? (
+                <div className="text-sm text-success">{fmtMoney(remaining)} remaining</div>
+              ) : (
+                <div className="text-sm text-destructive">Over by {fmtMoney(Math.abs(remaining))}</div>
+              )
+            ) : <div />}
+            <div className="text-xs text-muted-foreground">{today}</div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
