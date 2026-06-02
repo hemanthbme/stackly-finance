@@ -845,7 +845,20 @@ function BudgetPage() {
                     />
                   );
                 })()}
-              </div>
+          </div>
+
+          <ForecastEngine
+            spending={spending}
+            recurringEntries={recurring}
+            monthStart={monthStart}
+            today={today}
+            monthlyLimit={monthlyLimit}
+            totalMonth={totalMonth}
+            daysElapsed={projection.daysElapsed}
+            daysRemaining={projection.daysRemaining}
+            daysInMonth={projection.daysInMonth}
+            lastMonthTotal={lastMonthTotal}
+          />
 
             ) : (
               <div className="mt-3 text-sm text-muted-foreground">Set a monthly budget to see your projection.</div>
