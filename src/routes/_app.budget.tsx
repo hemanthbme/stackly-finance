@@ -113,24 +113,66 @@ function BudgetPage() {
   const [openSpend, setOpenSpend] = useState(false);
   const [openCat, setOpenCat] = useState(false);
   const [openRecurring, setOpenRecurring] = useState(false);
-  const [recurring, setRecurring] = useState<RecurringEntry[]>(() => {
-    if (typeof window === "undefined") return [];
-    try { return JSON.parse(localStorage.getItem("stackly:recurring") || "[]"); } catch { return []; }
-  });
-  const persistRecurring = (list: RecurringEntry[]) => {
-    setRecurring(list);
-    if (typeof window !== "undefined") localStorage.setItem("stackly:recurring", JSON.stringify(list));
+  const [recurring, setRecurring] = useState<RecurringEntry[]>([]);
+  const [recurringLoading, setRecurringLoading] = useState(true);
+  const [addingRecurring, setAddingRecurring] = useState(false);
+
+  const loadRecurring = async () => {
+    if (!active) { setRecurringLoading(false); return; }
+    setRecurringLoading(true);
+    const { data, error } = await supabase
+      .from("recurring_entries" as any)
+      .select("*")
+      .eq("household_id", active.id)
+      .eq("is_active", true)
+      .order("created_at");
+    if (!error && data) {
+      setRecurring(
+        (data as any[]).map((r) => ({
+          ...r,
+          amount: Number(r.amount),
+          member_id: r.member_id ?? null,
+        })) as RecurringEntry[]
+      );
+    }
+    setRecurringLoading(false);
   };
+
   const [rLabel, setRLabel] = useState("");
   const [rAmount, setRAmount] = useState("");
   const [rCategory, setRCategory] = useState("food");
   const [rMember, setRMember] = useState("");
-  const addRecurring = () => {
-    if (!rLabel.trim() || !rAmount) return;
-    persistRecurring([...recurring, { id: crypto.randomUUID(), label: rLabel.trim(), amount: Number(rAmount), category: rCategory, memberId: rMember }]);
+
+  const addRecurring = async () => {
+    if (!rLabel.trim() || !rAmount || !active) return;
+    setAddingRecurring(true);
+    const { error } = await supabase
+      .from("recurring_entries" as any)
+      .insert({
+        household_id: active.id,
+        label: rLabel.trim(),
+        amount: Number(rAmount),
+        category: rCategory,
+        member_id: rMember || null,
+        is_active: true,
+      } as any);
+    setAddingRecurring(false);
+    if (error) { toast.error(error.message); return; }
     setRLabel(""); setRAmount(""); setRCategory("food"); setRMember("");
+    toast.success("Recurring entry saved");
+    loadRecurring();
   };
-  const removeRecurring = (id: string) => persistRecurring(recurring.filter((r) => r.id !== id));
+
+  const removeRecurring = async (id: string) => {
+    const { error } = await supabase
+      .from("recurring_entries" as any)
+      .update({ is_active: false } as any)
+      .eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Removed");
+    loadRecurring();
+  };
+
   const logRecurring = async (r: RecurringEntry) => {
     if (!active) return;
     const isCustom = r.category.startsWith("custom:");
@@ -138,7 +180,7 @@ function BudgetPage() {
     const labelPrefix = isCustom ? `[${categoryLabel(r.category)}]` : "";
     const notesValue = [labelPrefix, r.label].filter(Boolean).join(" ").trim() || null;
     const { error } = await supabase.from("spending_entries").insert({
-      household_id: active.id, amount: r.amount, member_id: r.memberId || null,
+      household_id: active.id, amount: r.amount, member_id: r.member_id || null,
       category: dbCat as any, notes: notesValue,
       payment_method: null,
       spent_at: today, spent_local_date: today, user_timezone: tz,
