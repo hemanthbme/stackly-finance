@@ -110,7 +110,10 @@ function AccountsPage() {
                   <td className="px-4 py-3">{m?.name ?? <span className="text-muted-foreground">—</span>}</td>
                   <td className="px-4 py-3 capitalize">{a.ownership}</td>
                   <td className="px-4 py-3 text-right">
-                    <Button size="icon" variant="ghost" onClick={() => remove(a.id)}><Trash2 className="h-4 w-4" /></Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <EditDialog account={a} members={members} onSaved={refresh} />
+                      <Button size="icon" variant="ghost" onClick={() => remove(a.id)}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
                   </td>
                 </tr>
               );
