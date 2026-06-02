@@ -336,44 +336,14 @@ function BudgetPage() {
     ...projectionChart.map((p) => Math.max(p.actual ?? 0, p.projected ?? 0))
   ) || 1;
 
-  // ----- Weekly pace -----
-  const daysElapsedThisWeek = Math.max(1, Math.round((new Date(today).getTime() - new Date(weekStart).getTime()) / 86400000) + 1);
-  const expectedWeekSpend = weeklyLimit > 0 ? (weeklyLimit / 7) * daysElapsedThisWeek : 0;
-  const weeklyPaceStatus: "on_track" | "slightly_ahead" | "overpacing" =
-    weeklyLimit === 0 ? "on_track"
-    : totalWeek > expectedWeekSpend * 1.2 ? "overpacing"
-    : totalWeek > expectedWeekSpend * 1.05 ? "slightly_ahead"
-    : "on_track";
-
   // ----- Status -----
   const status = useMemo(() => {
-    const recoveryPerDayWeekly = Math.max(0, (weeklyLimit - totalWeek)) / Math.max(1, 7 - daysElapsedThisWeek);
-    const recoveryPerDayMonthly = Math.max(0, (monthlyLimit - totalMonth)) / Math.max(1, projection.daysRemaining);
-
-    if (dCard.limit > 0 && dCard.remaining < 0) {
-      return { msg: `Over by ${fmtMoney(Math.abs(dCard.remaining))} today — resets tomorrow`, tone: "destructive" as const, emoji: "🔴" };
-    }
-    if (wCard.limit > 0 && wCard.remaining < 0) {
-      return { msg: `Over weekly limit by ${fmtMoney(Math.abs(wCard.remaining))} — spend at most ${fmtMoney(recoveryPerDayWeekly)}/day to recover`, tone: "destructive" as const, emoji: "🔴" };
-    }
-    if (mCard.limit > 0 && mCard.remaining < 0) {
-      return { msg: `Over monthly limit by ${fmtMoney(Math.abs(mCard.remaining))} — spend at most ${fmtMoney(recoveryPerDayMonthly)}/day to recover`, tone: "destructive" as const, emoji: "🔴" };
-    }
-    const close = [dCard, wCard, mCard].find((c) => c.limit > 0 && c.pct >= 80);
-    if (close) {
-      return { msg: `Getting close to your ${close.label.toLowerCase()} limit — ${fmtMoney(close.remaining)} left`, tone: "warning" as const, emoji: "🟡" };
-    }
-    if (weeklyPaceStatus === "overpacing") {
-      return { msg: "Spending faster than usual this week — watch your pace", tone: "warning" as const, emoji: "🟡" };
-    }
-    const anyLimit = dCard.limit > 0 || wCard.limit > 0 || mCard.limit > 0;
-    if (anyLimit) {
-      const remaining = dCard.limit > 0 ? dCard.remaining : wCard.limit > 0 ? wCard.remaining : mCard.remaining;
-      const scope = dCard.limit > 0 ? "today" : wCard.limit > 0 ? "this week" : "this month";
-      return { msg: `On track — ${fmtMoney(remaining)} left ${scope}`, tone: "success" as const, emoji: "🟢" };
-    }
-    return { msg: "Set a budget to start tracking.", tone: "default" as const, emoji: "✨" };
-  }, [dCard, wCard, mCard, weeklyLimit, monthlyLimit, totalWeek, totalMonth, daysElapsedThisWeek, projection.daysRemaining, weeklyPaceStatus]);
+    if (!hasCombined && !hasIndividual) return { msg: "Set a budget to start tracking.", tone: "default" as const, emoji: "✨" };
+    return { msg: "x", tone: "default" as const, emoji: "✨" };
+  }, [hasCombined, hasIndividual]);
+  const daysElapsedThisWeek = 1;
+  const weeklyPaceStatus: "on_track" = "on_track";
+  const expectedWeekSpend = 0;
 
 
   const perMember = members.map((m) => {
