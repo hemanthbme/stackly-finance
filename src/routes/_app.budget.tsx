@@ -192,10 +192,37 @@ function BudgetPage() {
   const [sPayment, setSPayment] = useState("");
   const [sDate, setSDate] = useState(today);
   const [sIsFixed, setSIsFixed] = useState(false);
+  const [sIsCredit, setSIsCredit] = useState(false);
+  const [sCreditCategory, setSCreditCategory] = useState("return_amazon");
   useEffect(() => { setSDate(today); }, [today]);
-  useEffect(() => { if (!openSpend) setSIsFixed(false); }, [openSpend]);
+  useEffect(() => {
+    if (!openSpend) {
+      setSIsFixed(false);
+      setSIsCredit(false);
+      setSCreditCategory("return_amazon");
+    }
+  }, [openSpend]);
   const addSpend = async () => {
     if (!active || !sAmount) return;
+    if (sIsCredit) {
+      const creditLabel = CREDIT_CATEGORIES.find((c) => c.value === sCreditCategory)?.label ?? sCreditCategory;
+      const notesValue = [`[CREDIT] ${creditLabel}`, sNotes].filter(Boolean).join(" — ").trim() || `[CREDIT] ${creditLabel}`;
+      const { error } = await supabase.from("spending_entries").insert({
+        household_id: active.id,
+        amount: Math.abs(Number(sAmount)),
+        member_id: sMember || null,
+        category: "other" as any,
+        notes: notesValue,
+        payment_method: sPayment || null,
+        spent_at: sDate,
+        spent_local_date: sDate,
+        user_timezone: tz,
+      } as any);
+      if (error) return toast.error(error.message);
+      setSAmount(""); setSNotes(""); setSPayment(""); setSIsCredit(false); setOpenSpend(false); loadAll();
+      toast.success("Credit logged");
+      return;
+    }
     // Custom categories use the "other" enum + store real name in notes prefix
     const isCustom = sCategory.startsWith("custom:");
     const dbCat = isCustom ? "other" : sCategory;
