@@ -542,19 +542,53 @@ function BudgetPage() {
 
           {/* Category breakdown */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
-            <h3 className="font-display text-lg font-semibold">By category (30d)</h3>
-            <div className="mt-4 space-y-2">
-              {catBreakdown.length === 0 && <div className="py-6 text-center text-sm text-muted-foreground">Nothing logged yet.</div>}
-              {catBreakdown.map((c) => (
-                <div key={c.key} className="flex items-center gap-3">
-                  <div className="w-28 truncate text-xs text-muted-foreground">{c.label}</div>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full bg-gradient-primary transition-all" style={{ width: `${(c.value / catMax) * 100}%` }} />
-                  </div>
-                  <div className="w-20 text-right text-sm font-medium">{fmtMoney(c.value)}</div>
+            <h3 className="font-display text-lg font-semibold">Spending breakdown (30d)</h3>
+            {catBreakdown.length === 0 ? (
+              <div className="py-6 text-center text-sm text-muted-foreground">Nothing logged yet.</div>
+            ) : (
+              <div className="mt-4 grid gap-6 md:grid-cols-2">
+                <div>
+                  <div className="mb-3 text-sm font-medium text-muted-foreground">By category</div>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie
+                        data={catBreakdown}
+                        dataKey="value"
+                        nameKey="label"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={90}
+                        paddingAngle={2}
+                      >
+                        {catBreakdown.map((_, i) => (
+                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip
+                        contentStyle={CHART_TOOLTIP_STYLE}
+                        formatter={(value) => fmtMoney(value as number)}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-            </div>
+                <div>
+                  <div className="mb-3 text-sm font-medium text-muted-foreground">Top categories</div>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={catBreakdown.slice(0, 6)} layout="vertical" margin={{ left: 8, right: 16 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.28 0.05 280)" />
+                      <XAxis type="number" fontSize={11} tickFormatter={(v) => fmtMoney(v)} stroke="oklch(0.7 0.04 270)" />
+                      <YAxis type="category" dataKey="label" fontSize={11} width={80} stroke="oklch(0.7 0.04 270)" />
+                      <RechartsTooltip
+                        contentStyle={CHART_TOOLTIP_STYLE}
+                        formatter={(value) => fmtMoney(value as number)}
+                      />
+                      <Bar dataKey="value" name="Spent" radius={[0, 4, 4, 0]} fill="oklch(0.62 0.22 277)" maxBarSize={22} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Recent spending with edit */}
