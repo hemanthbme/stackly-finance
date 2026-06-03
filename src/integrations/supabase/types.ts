@@ -401,6 +401,7 @@ export type Database = {
           date_format: string | null
           display_name: string | null
           id: string
+          onboarding_completed: boolean
           theme: string | null
           user_timezone: string | null
           week_start: string | null
@@ -412,6 +413,7 @@ export type Database = {
           date_format?: string | null
           display_name?: string | null
           id: string
+          onboarding_completed?: boolean
           theme?: string | null
           user_timezone?: string | null
           week_start?: string | null
@@ -423,6 +425,7 @@ export type Database = {
           date_format?: string | null
           display_name?: string | null
           id?: string
+          onboarding_completed?: boolean
           theme?: string | null
           user_timezone?: string | null
           week_start?: string | null
