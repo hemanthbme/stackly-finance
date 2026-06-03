@@ -288,7 +288,7 @@ function InviteSection() {
           <DialogTrigger asChild>
             <Button className="bg-gradient-primary"><UserPlus className="mr-2 h-4 w-4" />Invite member</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Invite to household</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <div>
