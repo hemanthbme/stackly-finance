@@ -69,7 +69,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <ProfileCtx.Provider value={{ profile, loading, refresh, update, tz: profile?.user_timezone || browserTz() }}>
+    <ProfileCtx.Provider value={{ profile, loading, refresh, refreshProfile: refresh, update, tz: profile?.user_timezone || browserTz() }}>
       {children}
     </ProfileCtx.Provider>
   );
