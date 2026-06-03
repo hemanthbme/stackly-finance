@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "public read invites" ON public.household_invites;
