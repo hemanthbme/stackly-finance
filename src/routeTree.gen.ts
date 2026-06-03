@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AppRouteImport } from './routes/_app'
@@ -31,6 +32,11 @@ import { Route as AppAccountsRouteImport } from './routes/_app.accounts'
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -122,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
   '/signup': typeof SignupRoute
   '/accounts': typeof AppAccountsRoute
   '/analytics': typeof AppAnalyticsRoute
@@ -141,6 +148,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
   '/signup': typeof SignupRoute
   '/accounts': typeof AppAccountsRoute
   '/analytics': typeof AppAnalyticsRoute
@@ -162,6 +170,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/admin': typeof AdminRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
   '/signup': typeof SignupRoute
   '/_app/accounts': typeof AppAccountsRoute
   '/_app/analytics': typeof AppAnalyticsRoute
@@ -183,6 +192,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/login'
+    | '/privacy'
     | '/signup'
     | '/accounts'
     | '/analytics'
@@ -202,6 +212,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/login'
+    | '/privacy'
     | '/signup'
     | '/accounts'
     | '/analytics'
@@ -222,6 +233,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/admin'
     | '/login'
+    | '/privacy'
     | '/signup'
     | '/_app/accounts'
     | '/_app/analytics'
@@ -243,6 +255,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   AdminRoute: typeof AdminRoute
   LoginRoute: typeof LoginRoute
+  PrivacyRoute: typeof PrivacyRoute
   SignupRoute: typeof SignupRoute
   InviteTokenRoute: typeof InviteTokenRoute
 }
@@ -254,6 +267,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -415,6 +435,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   AdminRoute: AdminRoute,
   LoginRoute: LoginRoute,
+  PrivacyRoute: PrivacyRoute,
   SignupRoute: SignupRoute,
   InviteTokenRoute: InviteTokenRoute,
 }
