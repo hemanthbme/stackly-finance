@@ -245,12 +245,24 @@ function InviteSection() {
       } as any)
       .select()
       .single();
-    setGenerating(false);
-    if (error) return toast.error(error.message);
-    const link = `${window.location.origin}/invite/${(data as any).invite_token}`;
+    if (error) {
+      toast.error(error.message);
+      setGenerating(false);
+      return;
+    }
+    const token = (data as any).invite_token;
+    if (!token) {
+      toast.error("Failed to generate invite token. Please try again.");
+      setGenerating(false);
+      return;
+    }
+    const link = `${window.location.origin}/invite/${token}`;
     setGeneratedLink(link);
+    setGenerating(false);
+    toast.success("Invite link generated!");
     loadInvites();
   };
+
 
   const revoke = async (id: string) => {
     const { error } = await supabase
@@ -276,7 +288,7 @@ function InviteSection() {
           <DialogTrigger asChild>
             <Button className="bg-gradient-primary"><UserPlus className="mr-2 h-4 w-4" />Invite member</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>Invite to household</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <div>
@@ -311,10 +323,14 @@ function InviteSection() {
                     type="email"
                     className="flex-1"
                   />
-                  {inviteEmail && generatedLink && (
+                  {inviteEmail && (
                     <Button
                       variant="outline"
                       onClick={() => {
+                        if (!generatedLink) {
+                          toast.error("Generate the invite link first, then send.");
+                          return;
+                        }
                         const subject = encodeURIComponent("Join me on Stackly");
                         const body = encodeURIComponent(
                           `Hi! I'd like you to join my household on Stackly — our finance tracker.\n\nClick this link to join:\n${generatedLink}\n\nThis link expires in 7 days.`,
@@ -322,7 +338,7 @@ function InviteSection() {
                         window.open(`mailto:${inviteEmail}?subject=${subject}&body=${body}`);
                       }}
                     >
-                      <Mail className="mr-2 h-4 w-4" />Send email
+                      <Mail className="mr-2 h-4 w-4" />Send
                     </Button>
                   )}
                 </div>
