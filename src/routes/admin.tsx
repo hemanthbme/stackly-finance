@@ -9,8 +9,6 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-const ADMIN_EMAIL = "hemanth.bme@gmail.com";
-
 type Row = {
   user_id: string;
   email: string;
@@ -31,19 +29,23 @@ function AdminPage() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
-
-  const authorized = !!user && user.email === ADMIN_EMAIL;
+  const [authorized, setAuthorized] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (!authorized) return;
+    if (authLoading) return;
+    if (!user) { setAuthorized(false); return; }
     (async () => {
       const { data, error } = await supabase.rpc("admin_user_summary");
-      if (error) { setError(error.message); setRows([]); return; }
+      if (error) {
+        setAuthorized(false);
+        return;
+      }
+      setAuthorized(true);
       setRows((data ?? []) as Row[]);
     })();
-  }, [authorized]);
+  }, [user, authLoading]);
 
-  if (authLoading) return null;
+  if (authLoading || authorized === null) return null;
 
   if (!authorized) {
     return (
@@ -55,6 +57,7 @@ function AdminPage() {
       </div>
     );
   }
+
 
   const filtered = (rows ?? []).filter((r) => {
     const q = search.toLowerCase();
