@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { OnboardingModal } from "@/components/OnboardingModal";
 
 export const Route = createFileRoute("/_app")({
   component: AppShell,
