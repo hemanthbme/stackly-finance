@@ -1,0 +1,3 @@
+UPDATE public.household_members SET user_id = 'ffd03d55-8d29-4848-8179-c87d204b70bd' WHERE name = 'Hemanth P Mohanadas' AND household_id = (SELECT id FROM public.households WHERE name = 'Hemz and Swa');
+
+UPDATE public.household_members SET user_id = 'dc1ac06e-af20-4f8b-8f8a-9a58bfac594e' WHERE name = 'Swathy N Harishkumar' AND household_id = (SELECT id FROM public.households WHERE name = 'Hemz and Swa');
