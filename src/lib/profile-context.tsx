@@ -52,6 +52,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         date_format: p.date_format || "MM/DD/YYYY",
         week_start: (p.week_start as any) || "sunday",
         theme: (p.theme as any) || "system",
+        onboarding_completed: !!p.onboarding_completed,
       });
     }
     setLoading(false);
