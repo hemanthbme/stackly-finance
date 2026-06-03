@@ -107,6 +107,7 @@ function AppShell() {
           <Outlet />
         </main>
       </div>
+      <OnboardingModal />
     </div>
   );
 }
