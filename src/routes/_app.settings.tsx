@@ -245,12 +245,24 @@ function InviteSection() {
       } as any)
       .select()
       .single();
-    setGenerating(false);
-    if (error) return toast.error(error.message);
-    const link = `${window.location.origin}/invite/${(data as any).invite_token}`;
+    if (error) {
+      toast.error(error.message);
+      setGenerating(false);
+      return;
+    }
+    const token = (data as any).invite_token;
+    if (!token) {
+      toast.error("Failed to generate invite token. Please try again.");
+      setGenerating(false);
+      return;
+    }
+    const link = `${window.location.origin}/invite/${token}`;
     setGeneratedLink(link);
+    setGenerating(false);
+    toast.success("Invite link generated!");
     loadInvites();
   };
+
 
   const revoke = async (id: string) => {
     const { error } = await supabase
