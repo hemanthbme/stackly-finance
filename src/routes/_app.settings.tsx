@@ -331,29 +331,35 @@ function InviteSection() {
                 </p>
               </div>
 
-              {!generatedLink ? (
+              <div className="space-y-3">
                 <Button onClick={generateInvite} disabled={generating} className="w-full bg-gradient-primary">
-                  {generating ? "Generating…" : "Generate invite link"}
+                  {generating ? "Generating…" : generatedLink ? "Regenerate link" : "Generate invite link"}
                 </Button>
-              ) : (
-                <div>
-                  <Label className="mb-2 block">Invite link (expires in 7 days)</Label>
-                  <div className="flex gap-2">
-                    <div className="flex-1 truncate rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
-                      {generatedLink}
+
+                {generatedLink && (
+                  <div className="space-y-1.5">
+                    <Label>Invite link (expires in 7 days)</Label>
+                    <div className="flex gap-2">
+                      <div className="flex-1 truncate rounded-md border border-border bg-muted/30 px-3 py-2 text-xs font-mono">
+                        {generatedLink}
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          navigator.clipboard.writeText(generatedLink);
+                          toast.success("Link copied!");
+                        }}
+                      >
+                        <Copy className="mr-2 h-4 w-4" />Copy
+                      </Button>
                     </div>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        navigator.clipboard.writeText(generatedLink);
-                        toast.success("Link copied!");
-                      }}
-                    >
-                      <Copy className="mr-2 h-4 w-4" />Copy
-                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      Share this link with anyone you want to invite. It expires in 7 days and can only be used once.
+                    </p>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+
             </div>
           </DialogContent>
         </Dialog>
