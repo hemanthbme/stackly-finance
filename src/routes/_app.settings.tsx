@@ -323,10 +323,14 @@ function InviteSection() {
                     type="email"
                     className="flex-1"
                   />
-                  {inviteEmail && generatedLink && (
+                  {inviteEmail && (
                     <Button
                       variant="outline"
                       onClick={() => {
+                        if (!generatedLink) {
+                          toast.error("Generate the invite link first, then send.");
+                          return;
+                        }
                         const subject = encodeURIComponent("Join me on Stackly");
                         const body = encodeURIComponent(
                           `Hi! I'd like you to join my household on Stackly — our finance tracker.\n\nClick this link to join:\n${generatedLink}\n\nThis link expires in 7 days.`,
@@ -334,7 +338,7 @@ function InviteSection() {
                         window.open(`mailto:${inviteEmail}?subject=${subject}&body=${body}`);
                       }}
                     >
-                      <Mail className="mr-2 h-4 w-4" />Send email
+                      <Mail className="mr-2 h-4 w-4" />Send
                     </Button>
                   )}
                 </div>
