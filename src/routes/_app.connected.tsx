@@ -25,7 +25,11 @@ function ConnectedPage() {
     if (!active) return;
     setLoading(true);
     const [i, a] = await Promise.all([
-      supabase.from("connected_institutions").select("*").eq("household_id", active.id).order("created_at"),
+      supabase
+        .from("connected_institutions")
+        .select("id, institution_name, institution_id, provider, status, last_synced_at, household_id, created_by, created_at")
+        .eq("household_id", active.id)
+        .order("created_at"),
       supabase.from("connected_accounts").select("*").eq("household_id", active.id).order("name"),
     ]);
     setInsts((i.data ?? []) as any);
