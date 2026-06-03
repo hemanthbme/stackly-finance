@@ -12,17 +12,19 @@ export interface Profile {
   date_format: string;
   week_start: "sunday" | "monday";
   theme: "light" | "dark" | "system";
+  onboarding_completed: boolean;
 }
 
 interface Ctx {
   profile: Profile | null;
   loading: boolean;
   refresh: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
   update: (patch: Partial<Profile>) => Promise<{ error?: string }>;
   tz: string;
 }
 
-const ProfileCtx = createContext<Ctx>({ profile: null, loading: true, refresh: async () => {}, update: async () => ({}), tz: browserTz() });
+const ProfileCtx = createContext<Ctx>({ profile: null, loading: true, refresh: async () => {}, refreshProfile: async () => {}, update: async () => ({}), tz: browserTz() });
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -50,6 +52,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         date_format: p.date_format || "MM/DD/YYYY",
         week_start: (p.week_start as any) || "sunday",
         theme: (p.theme as any) || "system",
+        onboarding_completed: !!p.onboarding_completed,
       });
     }
     setLoading(false);
@@ -66,7 +69,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <ProfileCtx.Provider value={{ profile, loading, refresh, update, tz: profile?.user_timezone || browserTz() }}>
+    <ProfileCtx.Provider value={{ profile, loading, refresh, refreshProfile: refresh, update, tz: profile?.user_timezone || browserTz() }}>
       {children}
     </ProfileCtx.Provider>
   );
