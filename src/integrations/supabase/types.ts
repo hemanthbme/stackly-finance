@@ -694,6 +694,7 @@ export type Database = {
           member_count: number
           member_names: string
           signed_up_at: string
+          snapshot_count: number
           spending_30d: number
           spending_total: number
           user_id: string
