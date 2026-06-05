@@ -138,7 +138,35 @@ function AdminPage() {
   }).length;
   const totalHouseholds = new Set(enrichedRows.map((r) => r.household_id).filter(Boolean)).size;
 
-  if (authLoading || authorized === null) return null;
+  if (authLoading) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-4">
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-4">
+        <div className="space-y-4 text-center">
+          <h1 className="font-display text-2xl font-bold">Admin access</h1>
+          <p className="text-sm text-muted-foreground">Please sign in to continue.</p>
+          <Button asChild>
+            <Link to="/login">Sign in</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (authorized === null) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-background px-4">
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      </div>
+    );
+  }
 
   if (!authorized) {
     return (
