@@ -57,11 +57,13 @@ function AdminPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!user || !clientGate) {
+      console.log("Admin gate failed — user:", user?.email, "clientGate:", clientGate);
       setAuthorized(false);
       return;
     }
     (async () => {
       const { data, error } = await supabase.rpc("admin_user_summary");
+      console.log("Admin RPC result — data:", data, "error:", error);
       if (error) {
         setAuthorized(false);
         setError(error.message);
@@ -171,9 +173,22 @@ function AdminPage() {
   if (!authorized) {
     return (
       <div className="grid min-h-screen place-items-center bg-background px-4">
-        <div className="space-y-4 text-center">
+        <div className="max-w-md space-y-4 text-center">
           <h1 className="font-display text-2xl font-bold">Not authorized</h1>
-          {error && <p className="text-sm text-muted-foreground">{error}</p>}
+          <p className="text-sm text-muted-foreground">
+            Signed in as <span className="font-medium text-foreground">{user?.email ?? "unknown"}</span>
+          </p>
+          {error && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-left text-sm text-destructive">
+              <div className="mb-1 font-medium">Error</div>
+              <div className="break-words font-mono text-xs">{error}</div>
+            </div>
+          )}
+          {!error && (
+            <p className="text-xs text-muted-foreground">
+              Your account is not on the admin allowlist.
+            </p>
+          )}
           <Button asChild variant="outline">
             <Link to="/">Go home</Link>
           </Button>
