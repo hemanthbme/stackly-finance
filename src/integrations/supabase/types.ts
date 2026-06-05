@@ -684,13 +684,18 @@ export type Database = {
       admin_user_summary: {
         Args: never
         Returns: {
+          account_count: number
+          activity_score: number
           email: string
           household_id: string
           household_name: string
           last_active_at: string
+          last_entry_at: string
           member_count: number
           member_names: string
           signed_up_at: string
+          spending_30d: number
+          spending_total: number
           user_id: string
         }[]
       }
