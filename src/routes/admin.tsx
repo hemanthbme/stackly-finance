@@ -57,11 +57,13 @@ function AdminPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!user || !clientGate) {
+      console.log("Admin gate failed — user:", user?.email, "clientGate:", clientGate);
       setAuthorized(false);
       return;
     }
     (async () => {
       const { data, error } = await supabase.rpc("admin_user_summary");
+      console.log("Admin RPC result — data:", data, "error:", error);
       if (error) {
         setAuthorized(false);
         setError(error.message);
