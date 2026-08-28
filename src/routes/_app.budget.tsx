@@ -376,15 +376,15 @@ function BudgetPage() {
   const sumWindow = (start: string, memberFilter?: string | null) =>
     sumWindowFiltered(pureVariableSpending, start, memberFilter);
 
-  const totalVariableToday = sumWindowFiltered(pureVariableSpending, today);
-  const totalVariableWeek = sumWindowFiltered(pureVariableSpending, weekStart);
-  const totalVariableMonth = sumWindowFiltered(pureVariableSpending, monthStart);
-  const totalFixedToday = sumWindowFiltered(fixedSpending, today);
-  const totalFixedWeek = sumWindowFiltered(fixedSpending, weekStart);
-  const totalFixedMonth = sumWindowFiltered(fixedSpending, monthStart);
   const totalCreditsToday = sumWindowFiltered(creditSpending, today);
   const totalCreditsWeek = sumWindowFiltered(creditSpending, weekStart);
   const totalCreditsMonth = sumWindowFiltered(creditSpending, monthStart);
+  const totalVariableToday = Math.max(0, sumWindowFiltered(pureVariableSpending, today) - totalCreditsToday);
+  const totalVariableWeek = Math.max(0, sumWindowFiltered(pureVariableSpending, weekStart) - totalCreditsWeek);
+  const totalVariableMonth = Math.max(0, sumWindowFiltered(pureVariableSpending, monthStart) - totalCreditsMonth);
+  const totalFixedToday = sumWindowFiltered(fixedSpending, today);
+  const totalFixedWeek = sumWindowFiltered(fixedSpending, weekStart);
+  const totalFixedMonth = sumWindowFiltered(fixedSpending, monthStart);
   const creditsCountMonth = creditSpending.filter((s) => {
     const d = s.spent_local_date || s.spent_at;
     return d >= monthStart && d <= today;
@@ -740,7 +740,7 @@ function BudgetPage() {
                 </div>
                 {sIsCredit && (
                   <div className="rounded-lg bg-success/10 border border-success/30 px-3 py-2 text-xs text-success font-medium">
-                    💚 This will be logged as money received — it won't reduce your daily spending total
+                    💚 This return or credit will be subtracted from your daily, weekly and monthly spending totals
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-3">
