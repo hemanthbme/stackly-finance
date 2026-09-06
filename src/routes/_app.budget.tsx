@@ -999,9 +999,9 @@ function BudgetPage() {
                 </div>
                 <div className="space-y-4 mt-4">
                   {[
-                    { label: "Today", spent: totalVariableToday, limit: variableDailyLimit, showPace: false, expectedPct: undefined, paceStatus: undefined, paceDiff: undefined, paceLabel: undefined },
-                    { label: "This week", spent: totalVariableWeek, limit: variableWeeklyLimit, showPace: true, expectedPct: expectedWeekPct, paceStatus: weekPaceStatus, paceDiff: weekPaceDiff, paceLabel: `expected ${fmtMoney(expectedWeekSpendPace)} · day ${daysElapsedThisWeek} of 7` },
-                    { label: "This month", spent: totalVariableMonth, limit: variableMonthlyLimit, showPace: true, expectedPct: expectedMonthPct, paceStatus: monthPaceStatus, paceDiff: monthPaceDiff, paceLabel: `expected ${fmtMoney(expectedMonthSpend)} · day ${dayOfMonth} of ${daysInMonth}` },
+                    { label: "Today", spent: totalVariableToday, limit: variableDailyLimit, showPace: false, expectedPct: 0, paceStatus: "none" as const, paceDiff: 0, paceLabel: "" },
+                    { label: "This week", spent: totalVariableWeek, limit: variableWeeklyLimit, showPace: true, expectedPct: expectedWeekPct, paceStatus: weekPaceStatus as "ahead" | "close" | "behind" | "none", paceDiff: weekPaceDiff, paceLabel: `expected ${fmtMoney(expectedWeekSpendPace)} · day ${daysElapsedThisWeek} of 7` },
+                    { label: "This month", spent: totalVariableMonth, limit: variableMonthlyLimit, showPace: true, expectedPct: expectedMonthPct, paceStatus: monthPaceStatus as "ahead" | "close" | "behind" | "none", paceDiff: monthPaceDiff, paceLabel: `expected ${fmtMoney(expectedMonthSpend)} · day ${dayOfMonth} of ${daysInMonth}` },
                   ].map(({ label, spent, limit, showPace, expectedPct, paceStatus, paceDiff, paceLabel }) => {
                     const pct = limit ? Math.min(100, (spent / limit) * 100) : 0;
                     const remaining = limit - spent;
