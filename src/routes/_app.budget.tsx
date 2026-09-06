@@ -250,6 +250,9 @@ function BudgetPage() {
   const [sIsFixed, setSIsFixed] = useState(false);
   const [sIsCredit, setSIsCredit] = useState(false);
   const [sCreditCategory, setSCreditCategory] = useState("return_amazon");
+  const [breakdownMonthOffset, setBreakdownMonthOffset] = useState(0);
+  const [spendSearch, setSpendSearch] = useState("");
+  const [spendTimeFilter, setSpendTimeFilter] = useState<"today" | "week" | "month" | "lastmonth" | "all">("all");
   useEffect(() => { setSDate(today); }, [today]);
   useEffect(() => {
     if (!openSpend) {
