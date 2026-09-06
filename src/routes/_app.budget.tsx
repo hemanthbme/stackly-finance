@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { fmtMoney, fmtMoneyExact, SPENDING_CATEGORIES } from "@/lib/finance";
 import { toast } from "sonner";
-import { Plus, Trash2, Sparkles, Flame, TrendingDown, TrendingUp, Pencil, Save, X, Tag } from "lucide-react";
+import { Plus, Trash2, TrendingDown, TrendingUp, Pencil, Save, X, Tag } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { ForecastEngine } from "@/components/ForecastEngine";
 import { useProfile } from "@/lib/profile-context";
