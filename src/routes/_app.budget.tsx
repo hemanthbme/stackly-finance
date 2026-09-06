@@ -1281,104 +1281,169 @@ function BudgetPage() {
             )}
           </div>
 
-          {/* Recent spending with edit */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
-            <h3 className="font-display text-lg font-semibold">Recent spending</h3>
-            <div className="mt-3 max-h-[28rem] space-y-2 overflow-auto">
-              {spending.slice(0, 50).map((s) => {
-                const isEdit = editingId === s.id;
-                const cat = SPENDING_CATEGORIES.find((c) => c.value === s.category)?.label ?? s.category;
-                const m = members.find((m) => m.id === s.member_id);
-                if (isEdit) {
-                  return (
-                    <div key={s.id} className="rounded-lg border border-primary/40 bg-muted/30 p-3">
-                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                        <div className="space-y-1"><Label className="text-xs">Amount</Label>
-                          <Input inputMode="decimal" value={String(editDraft.amount ?? "")} onChange={(e) => setEditDraft({ ...editDraft, amount: Number(e.target.value) })} />
-                        </div>
-                        <div className="space-y-1"><Label className="text-xs">Date</Label>
-                          <Input type="date" value={(editDraft.spent_at as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, spent_at: e.target.value })} />
-                        </div>
-                        <div className="space-y-1"><Label className="text-xs">Category</Label>
-                          <Select value={(editDraft.category as string) ?? "other"} onValueChange={(v) => setEditDraft({ ...editDraft, category: v })}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>{SPENDING_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-1"><Label className="text-xs">Member</Label>
-                          <Select value={(editDraft.member_id as string) || "none"} onValueChange={(v) => setEditDraft({ ...editDraft, member_id: v === "none" ? null : v })}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Household</SelectItem>
-                              {members.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-1"><Label className="text-xs">Payment</Label>
-                          {paymentMethodOptions.length > 0 ? (
-                            <Select
-                              value={paymentMethodOptions.find((p) => p.label === editDraft.payment_method)?.value || "none"}
-                              onValueChange={(v) => {
-                                const resolved = v === "none"
-                                  ? null
-                                  : (paymentMethodOptions.find((p) => p.value === v)?.label ?? null);
-                                setEditDraft({ ...editDraft, payment_method: resolved });
-                              }}
-                            >
-                              <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">— Not specified —</SelectItem>
-                                {paymentMethodOptions.map((p) => (
-                                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <Input
-                              value={(editDraft.payment_method as string) ?? ""}
-                              onChange={(e) => setEditDraft({ ...editDraft, payment_method: e.target.value })}
-                              placeholder="Payment method"
-                            />
-                          )}
-                        </div>
-                        <div className="space-y-1"><Label className="text-xs">Notes</Label>
-                          <Input value={(editDraft.notes as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, notes: e.target.value })} />
-                        </div>
-                      </div>
-                      <div className="mt-3 flex gap-2">
-                        <Button size="sm" onClick={saveEdit} className="bg-gradient-primary"><Save className="mr-1 h-3 w-3" />Save</Button>
-                        <Button size="sm" variant="ghost" onClick={cancelEdit}><X className="mr-1 h-3 w-3" />Cancel</Button>
-                      </div>
-                    </div>
-                  );
-                }
-                const isCredit = isCreditEntry(s);
-                const displayNotes = isCredit ? stripCreditPrefix(s.notes) : stripFixedPrefix(s.notes);
-                return (
-                  <div key={s.id} className={`flex items-center justify-between rounded-lg border px-3 py-2 ${isCredit ? "border-success/20 bg-success/5" : "border-border bg-muted/20"}`}>
-                    <div>
-                      <div className="text-sm font-medium flex items-center gap-2">
-                        {isCredit ? (
-                          <span className="text-success">+{fmtMoneyExact(s.amount)}</span>
-                        ) : (
-                          <span>{fmtMoneyExact(s.amount)} <span className="text-xs text-muted-foreground">· {cat}</span></span>
-                        )}
-                        {isCredit ? (
-                          <span className="rounded-full bg-success/10 text-success border border-success/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">Credit</span>
-                        ) : isFixedEntry(s) && (
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Fixed</span>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground">{s.spent_at} · {m?.name ?? "Household"}{s.payment_method ? ` · ${s.payment_method}` : ""}{displayNotes ? ` · ${displayNotes}` : ""}</div>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => startEdit(s)}><Pencil className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => removeSpend(s.id)}><Trash2 className="h-4 w-4" /></Button>
-                    </div>
+            <h3 className="font-display text-lg font-semibold mb-3">Recent spending</h3>
+
+            {/* Search */}
+            <div className="flex gap-2 mb-3">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={spendSearch}
+                  onChange={(e) => setSpendSearch(e.target.value)}
+                  placeholder="Search amount, category, notes..."
+                  className="w-full rounded-lg border border-border bg-muted/30 px-3 py-2 pl-8 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <span className="absolute left-2.5 top-2.5 text-muted-foreground pointer-events-none">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                </span>
+              </div>
+              {spendSearch && (
+                <Button variant="ghost" size="sm" onClick={() => setSpendSearch("")} className="px-2">✕</Button>
+              )}
+            </div>
+
+            {/* Time filters */}
+            <div className="flex gap-1.5 mb-3 flex-wrap">
+              {([
+                { key: "today", label: "Today" },
+                { key: "week", label: "This week" },
+                { key: "month", label: "This month" },
+                { key: "lastmonth", label: "Last month" },
+                { key: "all", label: "All" },
+              ] as const).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setSpendTimeFilter(key)}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    spendTimeFilter === key
+                      ? "bg-gradient-primary text-primary-foreground border-transparent"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Summary */}
+            {filteredSpending.length > 0 && (
+              <div className="flex gap-4 mb-3 px-3 py-2 rounded-lg bg-muted/30 flex-wrap text-xs">
+                <span className="text-muted-foreground"><span className="font-medium text-foreground">{filteredSummary.entries}</span> entries</span>
+                <span className="text-muted-foreground"><span className="font-medium text-foreground">{fmtMoney(filteredSummary.spent)}</span> spent</span>
+                {filteredSummary.returned > 0 && (
+                  <span className="text-muted-foreground"><span className="font-medium text-success">+{fmtMoney(filteredSummary.returned)}</span> returned</span>
+                )}
+                {filteredSummary.returned > 0 && (
+                  <span className="text-muted-foreground"><span className="font-medium text-primary">{fmtMoney(filteredSummary.net)}</span> net</span>
+                )}
+              </div>
+            )}
+
+            {/* Grouped entries */}
+            <div className="max-h-[32rem] space-y-1 overflow-auto">
+              {groupedSpending.length === 0 && (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  {spendSearch ? `No entries matching "${spendSearch}"` : "No spending in this period."}
+                </div>
+              )}
+              {groupedSpending.map(([date, entries]) => (
+                <div key={date}>
+                  <div className="sticky top-0 bg-card/95 backdrop-blur-sm px-1 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider z-10">
+                    {formatDateHeader(date)}
                   </div>
-                );
-              })}
-              {spending.length === 0 && <div className="py-6 text-center text-sm text-muted-foreground">No spending yet. <Sparkles className="ml-1 inline h-3 w-3" /></div>}
+                  <div className="space-y-1">
+                    {entries.map((s) => {
+                      const isEdit = editingId === s.id;
+                      const cat = SPENDING_CATEGORIES.find((c) => c.value === s.category)?.label ?? s.category;
+                      const m = members.find((m) => m.id === s.member_id);
+                      if (isEdit) {
+                        return (
+                          <div key={s.id} className="rounded-lg border border-primary/40 bg-muted/30 p-3">
+                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                              <div className="space-y-1"><Label className="text-xs">Amount</Label>
+                                <Input inputMode="decimal" value={String(editDraft.amount ?? "")} onChange={(e) => setEditDraft({ ...editDraft, amount: Number(e.target.value) })} />
+                              </div>
+                              <div className="space-y-1"><Label className="text-xs">Date</Label>
+                                <Input type="date" value={(editDraft.spent_at as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, spent_at: e.target.value })} />
+                              </div>
+                              <div className="space-y-1"><Label className="text-xs">Category</Label>
+                                <Select value={(editDraft.category as string) ?? "other"} onValueChange={(v) => setEditDraft({ ...editDraft, category: v })}>
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>{SPENDING_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1"><Label className="text-xs">Member</Label>
+                                <Select value={(editDraft.member_id as string) || "none"} onValueChange={(v) => setEditDraft({ ...editDraft, member_id: v === "none" ? null : v })}>
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">Household</SelectItem>
+                                    {members.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1"><Label className="text-xs">Payment</Label>
+                                {paymentMethodOptions.length > 0 ? (
+                                  <Select
+                                    value={paymentMethodOptions.find((p) => p.label === editDraft.payment_method)?.value || "none"}
+                                    onValueChange={(v) => {
+                                      const resolved = v === "none" ? null : (paymentMethodOptions.find((p) => p.value === v)?.label ?? null);
+                                      setEditDraft({ ...editDraft, payment_method: resolved });
+                                    }}
+                                  >
+                                    <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">— Not specified —</SelectItem>
+                                      {paymentMethodOptions.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <Input value={(editDraft.payment_method as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, payment_method: e.target.value })} placeholder="Payment method" />
+                                )}
+                              </div>
+                              <div className="space-y-1"><Label className="text-xs">Notes</Label>
+                                <Input value={(editDraft.notes as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, notes: e.target.value })} />
+                              </div>
+                            </div>
+                            <div className="mt-3 flex gap-2">
+                              <Button size="sm" onClick={saveEdit} className="bg-gradient-primary"><Save className="mr-1 h-3 w-3" />Save</Button>
+                              <Button size="sm" variant="ghost" onClick={cancelEdit}><X className="mr-1 h-3 w-3" />Cancel</Button>
+                            </div>
+                          </div>
+                        );
+                      }
+                      const isCredit = isCreditEntry(s);
+                      const displayNotes = isCredit ? stripCreditPrefix(s.notes) : stripFixedPrefix(s.notes);
+                      return (
+                        <div key={s.id} className={`flex items-center justify-between rounded-lg border px-3 py-2 ${isCredit ? "border-success/20 bg-success/5" : "border-border bg-muted/20"}`}>
+                          <div>
+                            <div className="text-sm font-medium flex items-center gap-2">
+                              {isCredit ? (
+                                <span className="text-success">+{fmtMoneyExact(s.amount)}</span>
+                              ) : (
+                                <span>{fmtMoneyExact(s.amount)} <span className="text-xs text-muted-foreground">· {cat}</span></span>
+                              )}
+                              {isCredit ? (
+                                <span className="rounded-full bg-success/10 text-success border border-success/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">Credit</span>
+                              ) : isFixedEntry(s) && (
+                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Fixed</span>
+                              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground">{m?.name ?? "Household"}{s.payment_method ? ` · ${s.payment_method}` : ""}{displayNotes ? ` · ${displayNotes}` : ""}</div>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => startEdit(s)}><Pencil className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => removeSpend(s.id)}><Trash2 className="h-4 w-4" /></Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              {filteredSpending.length > 100 && (
+                <div className="py-3 text-center text-xs text-muted-foreground">Showing first 100 entries. Use filters to narrow down.</div>
+              )}
             </div>
           </div>
         </TabsContent>
