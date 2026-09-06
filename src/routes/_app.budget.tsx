@@ -1194,11 +1194,26 @@ function BudgetPage() {
 
           {/* Category breakdown */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
-            <div className="flex items-baseline justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <h3 className="font-display text-lg font-semibold">Spending breakdown</h3>
-              <span className="text-xs text-muted-foreground">
-                {new Date(monthStart + "T12:00:00").toLocaleString("default", { month: "long", year: "numeric" })}
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setBreakdownMonthOffset((o) => o - 1)}
+                  className="rounded-lg border border-border bg-muted/30 px-2.5 py-1 text-sm hover:bg-muted transition-colors"
+                >←</button>
+                <span className="text-sm font-medium min-w-[130px] text-center">{breakdownMonthLabel}</span>
+                <button
+                  onClick={() => setBreakdownMonthOffset((o) => Math.min(0, o + 1))}
+                  disabled={breakdownMonthOffset === 0}
+                  className="rounded-lg border border-border bg-muted/30 px-2.5 py-1 text-sm hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >→</button>
+              </div>
+            </div>
+            <div className="flex gap-5 mt-2 mb-1 flex-wrap">
+              <div><div className="text-xs text-muted-foreground">Spent</div><div className="text-base font-semibold">{fmtMoney(breakdownSpent)}</div></div>
+              {breakdownCredits > 0 && <div><div className="text-xs text-muted-foreground">Returned</div><div className="text-base font-semibold text-success">+{fmtMoney(breakdownCredits)}</div></div>}
+              {breakdownCredits > 0 && <div><div className="text-xs text-muted-foreground">Net</div><div className="text-base font-semibold text-primary">{fmtMoney(breakdownNet)}</div></div>}
+              <div><div className="text-xs text-muted-foreground">Entries</div><div className="text-base font-semibold">{breakdownEntries}</div></div>
             </div>
             {catBreakdown.length === 0 ? (
               <div className="py-6 text-center text-sm text-muted-foreground">Nothing logged yet.</div>
