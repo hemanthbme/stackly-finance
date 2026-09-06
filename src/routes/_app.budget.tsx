@@ -1040,16 +1040,6 @@ function BudgetPage() {
                       </div>
                     );
                   })}
-                  {(variableWeeklyLimit > 0 || variableMonthlyLimit > 0) && (
-                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border flex-wrap">
-                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                        <div className="w-5 h-1.5 rounded-full bg-success" />Actual spend
-                      </div>
-                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                        <div className="w-[3px] h-3.5 rounded-sm bg-foreground/40" />Where you should be
-                      </div>
-                    </div>
-                  )}
                 </div>
                 {(totalCreditsToday > 0 || totalCreditsWeek > 0 || totalCreditsMonth > 0) && (
                   <div className="border-t border-border pt-3 mt-4">
@@ -1060,6 +1050,16 @@ function BudgetPage() {
                     <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
                       {totalCreditsToday > 0 && <span>Today: +{fmtMoney(totalCreditsToday)}</span>}
                       {totalCreditsWeek > 0 && <span>This week: +{fmtMoney(totalCreditsWeek)}</span>}
+                    </div>
+                  </div>
+                )}
+                {(variableWeeklyLimit > 0 || variableMonthlyLimit > 0) && (
+                  <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border flex-wrap">
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <div className="w-5 h-1.5 rounded-full bg-success" />Actual spend
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <div className="w-[3px] h-3.5 rounded-sm bg-foreground/40" />Where you should be
                     </div>
                   </div>
                 )}
