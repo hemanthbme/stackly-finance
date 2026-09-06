@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { fmtMoney, fmtMoneyExact, SPENDING_CATEGORIES } from "@/lib/finance";
 import { toast } from "sonner";
-import { Plus, Trash2, Sparkles, Flame, TrendingDown, TrendingUp, Pencil, Save, X, Tag } from "lucide-react";
+import { Plus, Trash2, TrendingDown, TrendingUp, Pencil, Save, X, Tag } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { ForecastEngine } from "@/components/ForecastEngine";
 import { useProfile } from "@/lib/profile-context";
@@ -250,6 +250,9 @@ function BudgetPage() {
   const [sIsFixed, setSIsFixed] = useState(false);
   const [sIsCredit, setSIsCredit] = useState(false);
   const [sCreditCategory, setSCreditCategory] = useState("return_amazon");
+  const [breakdownMonthOffset, setBreakdownMonthOffset] = useState(0);
+  const [spendSearch, setSpendSearch] = useState("");
+  const [spendTimeFilter, setSpendTimeFilter] = useState<"today" | "week" | "month" | "lastmonth" | "all">("all");
   useEffect(() => { setSDate(today); }, [today]);
   useEffect(() => {
     if (!openSpend) {
@@ -555,11 +558,27 @@ function BudgetPage() {
     return arr;
   }, [spending, monthStart]);
 
+  const breakdownMonthStart = useMemo(() => {
+    const [yy, mm] = monthStart.split("-").map(Number);
+    const d = new Date(yy, mm - 1 + breakdownMonthOffset, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  }, [monthStart, breakdownMonthOffset]);
+
+  const breakdownMonthEnd = useMemo(() => {
+    const [yy, mm] = breakdownMonthStart.split("-").map(Number);
+    const d = new Date(yy, mm, 0);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, [breakdownMonthStart]);
+
+  const breakdownMonthLabel = useMemo(() => {
+    return new Date(breakdownMonthStart + "T12:00:00").toLocaleString("default", { month: "long", year: "numeric" });
+  }, [breakdownMonthStart]);
+
   const catBreakdown = useMemo(() => {
     const map = new Map<string, number>();
     for (const s of pureVariableSpending) {
       const d = s.spent_local_date || s.spent_at;
-      if (d < monthStart || d > today) continue;
+      if (d < breakdownMonthStart || d > breakdownMonthEnd) continue;
       map.set(s.category, (map.get(s.category) ?? 0) + s.amount);
     }
     return Array.from(map.entries())
@@ -569,7 +588,17 @@ function BudgetPage() {
         label: allCategories.find((c) => c.value === k)?.label ?? k,
         value: v,
       }));
-  }, [pureVariableSpending, monthStart, today, allCategories]);
+  }, [pureVariableSpending, breakdownMonthStart, breakdownMonthEnd, allCategories]);
+
+  const breakdownCredits = useMemo(() =>
+    creditSpending
+      .filter((s) => { const d = s.spent_local_date || s.spent_at; return d >= breakdownMonthStart && d <= breakdownMonthEnd; })
+      .reduce((sum, s) => sum + s.amount, 0),
+  [creditSpending, breakdownMonthStart, breakdownMonthEnd]);
+
+  const breakdownSpent = catBreakdown.reduce((s, c) => s + c.value, 0);
+  const breakdownNet = breakdownSpent - breakdownCredits;
+  const breakdownEntries = pureVariableSpending.filter((s) => { const d = s.spent_local_date || s.spent_at; return d >= breakdownMonthStart && d <= breakdownMonthEnd; }).length;
   const catMax = Math.max(1, ...catBreakdown.map((c) => c.value));
 
   const PAYMENT_ACCOUNT_CATEGORIES = ["checking", "savings", "credit_card"];
@@ -583,6 +612,95 @@ function BudgetPage() {
       }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accounts]);
+
+  // Pace markers — week and month trackers
+  const todayPct = variableDailyLimit ? Math.min(100, (totalVariableToday / variableDailyLimit) * 100) : 0;
+  const todayRemaining = variableDailyLimit - totalVariableToday;
+  const todayOver = todayRemaining < 0;
+  const todayBarColor = !variableDailyLimit ? "bg-muted-foreground" : todayOver ? "bg-destructive" : todayPct >= 80 ? "bg-warning" : "bg-success";
+  const todayTextColor = !variableDailyLimit ? "text-muted-foreground" : todayOver ? "text-destructive" : todayPct >= 80 ? "text-warning" : "text-success";
+
+  const weekDaysElapsed = daysElapsedThisWeek;
+  const weekDaysTotal = 7;
+  const weekExpected = variableWeeklyLimit > 0 ? (variableWeeklyLimit / weekDaysTotal) * weekDaysElapsed : 0;
+  const weekExpectedPct = variableWeeklyLimit > 0 ? Math.min(100, (weekExpected / variableWeeklyLimit) * 100) : 0;
+  const weekActualPct = variableWeeklyLimit > 0 ? Math.min(100, (totalVariableWeek / variableWeeklyLimit) * 100) : 0;
+  const weekRemaining = variableWeeklyLimit - totalVariableWeek;
+  const weekOver = weekRemaining < 0;
+  const weekPaceGap = weekExpected - totalVariableWeek;
+  const weekAhead = weekPaceGap > 0;
+  const weekPaceClose = !weekOver && !weekAhead && Math.abs(weekPaceGap) / Math.max(1, variableWeeklyLimit) < 0.1;
+  const weekBarColor = weekOver ? "bg-destructive" : weekActualPct >= 80 ? "bg-warning" : "bg-success";
+  const weekTextColor = weekOver ? "text-destructive" : weekAhead ? "text-success" : weekPaceClose ? "text-warning" : "text-success";
+
+  const [, , todayDayNum] = today.split("-").map(Number);
+  const [yy2, mm2] = monthStart.split("-").map(Number);
+  const daysInMonth2 = new Date(yy2, mm2, 0).getDate();
+  const monthExpected = variableMonthlyLimit > 0 ? (variableMonthlyLimit / daysInMonth2) * todayDayNum : 0;
+  const monthExpectedPct = variableMonthlyLimit > 0 ? Math.min(100, (monthExpected / variableMonthlyLimit) * 100) : 0;
+  const monthActualPct = variableMonthlyLimit > 0 ? Math.min(100, (totalVariableMonth / variableMonthlyLimit) * 100) : 0;
+  const monthRemaining = variableMonthlyLimit - totalVariableMonth;
+  const monthOver = monthRemaining < 0;
+  const monthPaceGap = monthExpected - totalVariableMonth;
+  const monthAhead = monthPaceGap > 0;
+  const monthBarColor = monthOver ? "bg-destructive" : monthActualPct >= 80 ? "bg-warning" : "bg-success";
+  const monthTextColor = monthOver ? "text-destructive" : monthAhead ? "text-success" : "text-warning";
+
+  // Recent spending — filtered + grouped
+  const filteredSpending = useMemo(() => {
+    const [yy, mm] = monthStart.split("-").map(Number);
+    const prevMonthStartStr = mm === 1 ? `${yy - 1}-12-01` : `${yy}-${String(mm - 1).padStart(2, "0")}-01`;
+
+    return spending.filter((s) => {
+      const d = localDate(s);
+      if (spendTimeFilter === "today" && d !== today) return false;
+      if (spendTimeFilter === "week" && d < weekStart) return false;
+      if (spendTimeFilter === "month" && d < monthStart) return false;
+      if (spendTimeFilter === "lastmonth" && (d < prevMonthStartStr || d >= monthStart)) return false;
+
+      if (spendSearch.trim()) {
+        const q = spendSearch.toLowerCase();
+        const memberName = members.find((m) => m.id === s.member_id)?.name ?? "";
+        const cat = allCategories.find((c) => c.value === s.category)?.label ?? s.category;
+        const matches = [
+          String(s.amount),
+          cat,
+          s.notes ?? "",
+          memberName,
+          s.payment_method ?? "",
+        ].some((v) => v.toLowerCase().includes(q));
+        if (!matches) return false;
+      }
+      return true;
+    });
+  }, [spending, spendTimeFilter, spendSearch, today, weekStart, monthStart, members, allCategories]);
+
+  const filteredSummary = useMemo(() => {
+    const entries = filteredSpending.length;
+    const spent = filteredSpending.filter((s) => !isCreditEntry(s)).reduce((sum, s) => sum + s.amount, 0);
+    const returned = filteredSpending.filter((s) => isCreditEntry(s)).reduce((sum, s) => sum + s.amount, 0);
+    const net = spent - returned;
+    return { entries, spent, returned, net };
+  }, [filteredSpending]);
+
+  const groupedSpending = useMemo(() => {
+    const groups = new Map<string, typeof spending>();
+    for (const s of filteredSpending.slice(0, 100)) {
+      const d = localDate(s);
+      if (!groups.has(d)) groups.set(d, []);
+      groups.get(d)!.push(s);
+    }
+    return Array.from(groups.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [filteredSpending]);
+
+  const formatDateHeader = (iso: string) => {
+    if (iso === today) return `Today — ${new Date(iso + "T12:00:00").toLocaleDateString("default", { month: "short", day: "numeric" })}`;
+    const yesterday = new Date(today + "T12:00:00");
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yestIso = yesterday.toISOString().slice(0, 10);
+    if (iso === yestIso) return `Yesterday — ${new Date(iso + "T12:00:00").toLocaleDateString("default", { month: "short", day: "numeric" })}`;
+    return new Date(iso + "T12:00:00").toLocaleDateString("default", { month: "short", day: "numeric", weekday: "short" });
+  };
 
   return (
     <div className="space-y-6">
@@ -873,34 +991,68 @@ function BudgetPage() {
                   )}
                 </div>
                 <div className="space-y-4 mt-4">
-                  {[
-                    { label: "Today", spent: totalVariableToday, limit: variableDailyLimit },
-                    { label: "This week", spent: totalVariableWeek, limit: variableWeeklyLimit },
-                    { label: "This month", spent: totalVariableMonth, limit: variableMonthlyLimit },
-                  ].map(({ label, spent, limit }) => {
-                    const pct = limit ? Math.min(100, (spent / limit) * 100) : 0;
-                    const remaining = limit - spent;
-                    const over = remaining < 0;
-                    const tone = !limit ? "default" : over ? "destructive" : pct >= 80 ? "warning" : "success";
-                    const barColor = tone === "destructive" ? "bg-destructive" : tone === "warning" ? "bg-warning" : tone === "success" ? "bg-success" : "bg-muted-foreground";
-                    const textColor = tone === "destructive" ? "text-destructive" : tone === "warning" ? "text-warning" : tone === "success" ? "text-success" : "text-muted-foreground";
-                    return (
-                      <div key={label}>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-sm font-medium">{label}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {fmtMoney(spent)} of {limit ? fmtMoney(limit) : "—"}
-                          </span>
-                        </div>
-                        <div className="h-2.5 overflow-hidden rounded-full bg-muted">
-                          <div className={`h-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
-                        </div>
-                        <div className={`mt-1 text-xs font-medium ${textColor}`}>
-                          {!limit ? "No limit set" : over ? `Over by ${fmtMoney(Math.abs(remaining))}` : `${fmtMoney(remaining)} left`}
-                        </div>
+                  <div key="today">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm font-medium">Today</span>
+                      <span className="text-xs text-muted-foreground">{fmtMoney(totalVariableToday)} of {variableDailyLimit ? fmtMoney(variableDailyLimit) : "—"}</span>
+                    </div>
+                    <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                      <div className={`h-full transition-all ${todayBarColor}`} style={{ width: `${todayPct}%` }} />
+                    </div>
+                    <div className={`mt-1 text-xs font-medium ${todayTextColor}`}>
+                      {!variableDailyLimit ? "No limit set" : todayOver ? `Over by ${fmtMoney(Math.abs(todayRemaining))}` : `${fmtMoney(todayRemaining)} left today`}
+                    </div>
+                  </div>
+                  <div key="week">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm font-medium">This week</span>
+                      <span className="text-xs text-muted-foreground">{fmtMoney(totalVariableWeek)} of {variableWeeklyLimit ? fmtMoney(variableWeeklyLimit) : "—"}</span>
+                    </div>
+                    <div className="relative h-2.5 overflow-visible rounded-full bg-muted">
+                      <div className={`h-full rounded-full transition-all ${weekBarColor}`} style={{ width: `${weekActualPct}%` }} />
+                      {variableWeeklyLimit > 0 && (
+                        <div className="absolute top-[-4px] w-[2.5px] h-[18px] rounded-sm bg-foreground/40 z-10" style={{ left: `${weekExpectedPct}%` }} />
+                      )}
+                    </div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className={`text-xs font-medium ${weekTextColor}`}>
+                        {!variableWeeklyLimit ? "No limit set" : weekOver ? `Over by ${fmtMoney(Math.abs(weekRemaining))}` : weekAhead ? `${fmtMoney(weekPaceGap)} ahead of pace` : `${fmtMoney(Math.abs(weekPaceGap))} behind pace`}
+                      </span>
+                      {variableWeeklyLimit > 0 && (
+                        <span className="text-xs text-muted-foreground">expected {fmtMoney(weekExpected)} · day {weekDaysElapsed} of {weekDaysTotal}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div key="month">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm font-medium">This month</span>
+                      <span className="text-xs text-muted-foreground">{fmtMoney(totalVariableMonth)} of {variableMonthlyLimit ? fmtMoney(variableMonthlyLimit) : "—"}</span>
+                    </div>
+                    <div className="relative h-2.5 overflow-visible rounded-full bg-muted">
+                      <div className={`h-full rounded-full transition-all ${monthBarColor}`} style={{ width: `${monthActualPct}%` }} />
+                      {variableMonthlyLimit > 0 && (
+                        <div className="absolute top-[-4px] w-[2.5px] h-[18px] rounded-sm bg-foreground/40 z-10" style={{ left: `${monthExpectedPct}%` }} />
+                      )}
+                    </div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className={`text-xs font-medium ${monthTextColor}`}>
+                        {!variableMonthlyLimit ? "No limit set" : monthOver ? `Over by ${fmtMoney(Math.abs(monthRemaining))}` : monthAhead ? `${fmtMoney(monthPaceGap)} ahead of pace` : `${fmtMoney(Math.abs(monthPaceGap))} behind pace`}
+                      </span>
+                      {variableMonthlyLimit > 0 && (
+                        <span className="text-xs text-muted-foreground">expected {fmtMoney(monthExpected)} · day {todayDayNum} of {daysInMonth2}</span>
+                      )}
+                    </div>
+                  </div>
+                  {(variableWeeklyLimit > 0 || variableMonthlyLimit > 0) && (
+                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border flex-wrap">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <div className="w-4 h-1.5 rounded-full bg-success" />Actual spend
                       </div>
-                    );
-                  })}
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <div className="w-0.5 h-3.5 rounded-sm bg-foreground/40" />Where you should be
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {(totalCreditsToday > 0 || totalCreditsWeek > 0 || totalCreditsMonth > 0) && (
                   <div className="border-t border-border pt-3 mt-4">
@@ -1042,11 +1194,26 @@ function BudgetPage() {
 
           {/* Category breakdown */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
-            <div className="flex items-baseline justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <h3 className="font-display text-lg font-semibold">Spending breakdown</h3>
-              <span className="text-xs text-muted-foreground">
-                {new Date(monthStart + "T12:00:00").toLocaleString("default", { month: "long", year: "numeric" })}
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setBreakdownMonthOffset((o) => o - 1)}
+                  className="rounded-lg border border-border bg-muted/30 px-2.5 py-1 text-sm hover:bg-muted transition-colors"
+                >←</button>
+                <span className="text-sm font-medium min-w-[130px] text-center">{breakdownMonthLabel}</span>
+                <button
+                  onClick={() => setBreakdownMonthOffset((o) => Math.min(0, o + 1))}
+                  disabled={breakdownMonthOffset === 0}
+                  className="rounded-lg border border-border bg-muted/30 px-2.5 py-1 text-sm hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >→</button>
+              </div>
+            </div>
+            <div className="flex gap-5 mt-2 mb-1 flex-wrap">
+              <div><div className="text-xs text-muted-foreground">Spent</div><div className="text-base font-semibold">{fmtMoney(breakdownSpent)}</div></div>
+              {breakdownCredits > 0 && <div><div className="text-xs text-muted-foreground">Returned</div><div className="text-base font-semibold text-success">+{fmtMoney(breakdownCredits)}</div></div>}
+              {breakdownCredits > 0 && <div><div className="text-xs text-muted-foreground">Net</div><div className="text-base font-semibold text-primary">{fmtMoney(breakdownNet)}</div></div>}
+              <div><div className="text-xs text-muted-foreground">Entries</div><div className="text-base font-semibold">{breakdownEntries}</div></div>
             </div>
             {catBreakdown.length === 0 ? (
               <div className="py-6 text-center text-sm text-muted-foreground">Nothing logged yet.</div>
@@ -1114,104 +1281,169 @@ function BudgetPage() {
             )}
           </div>
 
-          {/* Recent spending with edit */}
           <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
-            <h3 className="font-display text-lg font-semibold">Recent spending</h3>
-            <div className="mt-3 max-h-[28rem] space-y-2 overflow-auto">
-              {spending.slice(0, 50).map((s) => {
-                const isEdit = editingId === s.id;
-                const cat = SPENDING_CATEGORIES.find((c) => c.value === s.category)?.label ?? s.category;
-                const m = members.find((m) => m.id === s.member_id);
-                if (isEdit) {
-                  return (
-                    <div key={s.id} className="rounded-lg border border-primary/40 bg-muted/30 p-3">
-                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                        <div className="space-y-1"><Label className="text-xs">Amount</Label>
-                          <Input inputMode="decimal" value={String(editDraft.amount ?? "")} onChange={(e) => setEditDraft({ ...editDraft, amount: Number(e.target.value) })} />
-                        </div>
-                        <div className="space-y-1"><Label className="text-xs">Date</Label>
-                          <Input type="date" value={(editDraft.spent_at as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, spent_at: e.target.value })} />
-                        </div>
-                        <div className="space-y-1"><Label className="text-xs">Category</Label>
-                          <Select value={(editDraft.category as string) ?? "other"} onValueChange={(v) => setEditDraft({ ...editDraft, category: v })}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>{SPENDING_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-1"><Label className="text-xs">Member</Label>
-                          <Select value={(editDraft.member_id as string) || "none"} onValueChange={(v) => setEditDraft({ ...editDraft, member_id: v === "none" ? null : v })}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Household</SelectItem>
-                              {members.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-1"><Label className="text-xs">Payment</Label>
-                          {paymentMethodOptions.length > 0 ? (
-                            <Select
-                              value={paymentMethodOptions.find((p) => p.label === editDraft.payment_method)?.value || "none"}
-                              onValueChange={(v) => {
-                                const resolved = v === "none"
-                                  ? null
-                                  : (paymentMethodOptions.find((p) => p.value === v)?.label ?? null);
-                                setEditDraft({ ...editDraft, payment_method: resolved });
-                              }}
-                            >
-                              <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">— Not specified —</SelectItem>
-                                {paymentMethodOptions.map((p) => (
-                                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          ) : (
-                            <Input
-                              value={(editDraft.payment_method as string) ?? ""}
-                              onChange={(e) => setEditDraft({ ...editDraft, payment_method: e.target.value })}
-                              placeholder="Payment method"
-                            />
-                          )}
-                        </div>
-                        <div className="space-y-1"><Label className="text-xs">Notes</Label>
-                          <Input value={(editDraft.notes as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, notes: e.target.value })} />
-                        </div>
-                      </div>
-                      <div className="mt-3 flex gap-2">
-                        <Button size="sm" onClick={saveEdit} className="bg-gradient-primary"><Save className="mr-1 h-3 w-3" />Save</Button>
-                        <Button size="sm" variant="ghost" onClick={cancelEdit}><X className="mr-1 h-3 w-3" />Cancel</Button>
-                      </div>
-                    </div>
-                  );
-                }
-                const isCredit = isCreditEntry(s);
-                const displayNotes = isCredit ? stripCreditPrefix(s.notes) : stripFixedPrefix(s.notes);
-                return (
-                  <div key={s.id} className={`flex items-center justify-between rounded-lg border px-3 py-2 ${isCredit ? "border-success/20 bg-success/5" : "border-border bg-muted/20"}`}>
-                    <div>
-                      <div className="text-sm font-medium flex items-center gap-2">
-                        {isCredit ? (
-                          <span className="text-success">+{fmtMoneyExact(s.amount)}</span>
-                        ) : (
-                          <span>{fmtMoneyExact(s.amount)} <span className="text-xs text-muted-foreground">· {cat}</span></span>
-                        )}
-                        {isCredit ? (
-                          <span className="rounded-full bg-success/10 text-success border border-success/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">Credit</span>
-                        ) : isFixedEntry(s) && (
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Fixed</span>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground">{s.spent_at} · {m?.name ?? "Household"}{s.payment_method ? ` · ${s.payment_method}` : ""}{displayNotes ? ` · ${displayNotes}` : ""}</div>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => startEdit(s)}><Pencil className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => removeSpend(s.id)}><Trash2 className="h-4 w-4" /></Button>
-                    </div>
+            <h3 className="font-display text-lg font-semibold mb-3">Recent spending</h3>
+
+            {/* Search */}
+            <div className="flex gap-2 mb-3">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={spendSearch}
+                  onChange={(e) => setSpendSearch(e.target.value)}
+                  placeholder="Search amount, category, notes..."
+                  className="w-full rounded-lg border border-border bg-muted/30 px-3 py-2 pl-8 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <span className="absolute left-2.5 top-2.5 text-muted-foreground pointer-events-none">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                </span>
+              </div>
+              {spendSearch && (
+                <Button variant="ghost" size="sm" onClick={() => setSpendSearch("")} className="px-2">✕</Button>
+              )}
+            </div>
+
+            {/* Time filters */}
+            <div className="flex gap-1.5 mb-3 flex-wrap">
+              {([
+                { key: "today", label: "Today" },
+                { key: "week", label: "This week" },
+                { key: "month", label: "This month" },
+                { key: "lastmonth", label: "Last month" },
+                { key: "all", label: "All" },
+              ] as const).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setSpendTimeFilter(key)}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    spendTimeFilter === key
+                      ? "bg-gradient-primary text-primary-foreground border-transparent"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Summary */}
+            {filteredSpending.length > 0 && (
+              <div className="flex gap-4 mb-3 px-3 py-2 rounded-lg bg-muted/30 flex-wrap text-xs">
+                <span className="text-muted-foreground"><span className="font-medium text-foreground">{filteredSummary.entries}</span> entries</span>
+                <span className="text-muted-foreground"><span className="font-medium text-foreground">{fmtMoney(filteredSummary.spent)}</span> spent</span>
+                {filteredSummary.returned > 0 && (
+                  <span className="text-muted-foreground"><span className="font-medium text-success">+{fmtMoney(filteredSummary.returned)}</span> returned</span>
+                )}
+                {filteredSummary.returned > 0 && (
+                  <span className="text-muted-foreground"><span className="font-medium text-primary">{fmtMoney(filteredSummary.net)}</span> net</span>
+                )}
+              </div>
+            )}
+
+            {/* Grouped entries */}
+            <div className="max-h-[32rem] space-y-1 overflow-auto">
+              {groupedSpending.length === 0 && (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  {spendSearch ? `No entries matching "${spendSearch}"` : "No spending in this period."}
+                </div>
+              )}
+              {groupedSpending.map(([date, entries]) => (
+                <div key={date}>
+                  <div className="sticky top-0 bg-card/95 backdrop-blur-sm px-1 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider z-10">
+                    {formatDateHeader(date)}
                   </div>
-                );
-              })}
-              {spending.length === 0 && <div className="py-6 text-center text-sm text-muted-foreground">No spending yet. <Sparkles className="ml-1 inline h-3 w-3" /></div>}
+                  <div className="space-y-1">
+                    {entries.map((s) => {
+                      const isEdit = editingId === s.id;
+                      const cat = SPENDING_CATEGORIES.find((c) => c.value === s.category)?.label ?? s.category;
+                      const m = members.find((m) => m.id === s.member_id);
+                      if (isEdit) {
+                        return (
+                          <div key={s.id} className="rounded-lg border border-primary/40 bg-muted/30 p-3">
+                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                              <div className="space-y-1"><Label className="text-xs">Amount</Label>
+                                <Input inputMode="decimal" value={String(editDraft.amount ?? "")} onChange={(e) => setEditDraft({ ...editDraft, amount: Number(e.target.value) })} />
+                              </div>
+                              <div className="space-y-1"><Label className="text-xs">Date</Label>
+                                <Input type="date" value={(editDraft.spent_at as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, spent_at: e.target.value })} />
+                              </div>
+                              <div className="space-y-1"><Label className="text-xs">Category</Label>
+                                <Select value={(editDraft.category as string) ?? "other"} onValueChange={(v) => setEditDraft({ ...editDraft, category: v })}>
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>{SPENDING_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1"><Label className="text-xs">Member</Label>
+                                <Select value={(editDraft.member_id as string) || "none"} onValueChange={(v) => setEditDraft({ ...editDraft, member_id: v === "none" ? null : v })}>
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">Household</SelectItem>
+                                    {members.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1"><Label className="text-xs">Payment</Label>
+                                {paymentMethodOptions.length > 0 ? (
+                                  <Select
+                                    value={paymentMethodOptions.find((p) => p.label === editDraft.payment_method)?.value || "none"}
+                                    onValueChange={(v) => {
+                                      const resolved = v === "none" ? null : (paymentMethodOptions.find((p) => p.value === v)?.label ?? null);
+                                      setEditDraft({ ...editDraft, payment_method: resolved });
+                                    }}
+                                  >
+                                    <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">— Not specified —</SelectItem>
+                                      {paymentMethodOptions.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <Input value={(editDraft.payment_method as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, payment_method: e.target.value })} placeholder="Payment method" />
+                                )}
+                              </div>
+                              <div className="space-y-1"><Label className="text-xs">Notes</Label>
+                                <Input value={(editDraft.notes as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, notes: e.target.value })} />
+                              </div>
+                            </div>
+                            <div className="mt-3 flex gap-2">
+                              <Button size="sm" onClick={saveEdit} className="bg-gradient-primary"><Save className="mr-1 h-3 w-3" />Save</Button>
+                              <Button size="sm" variant="ghost" onClick={cancelEdit}><X className="mr-1 h-3 w-3" />Cancel</Button>
+                            </div>
+                          </div>
+                        );
+                      }
+                      const isCredit = isCreditEntry(s);
+                      const displayNotes = isCredit ? stripCreditPrefix(s.notes) : stripFixedPrefix(s.notes);
+                      return (
+                        <div key={s.id} className={`flex items-center justify-between rounded-lg border px-3 py-2 ${isCredit ? "border-success/20 bg-success/5" : "border-border bg-muted/20"}`}>
+                          <div>
+                            <div className="text-sm font-medium flex items-center gap-2">
+                              {isCredit ? (
+                                <span className="text-success">+{fmtMoneyExact(s.amount)}</span>
+                              ) : (
+                                <span>{fmtMoneyExact(s.amount)} <span className="text-xs text-muted-foreground">· {cat}</span></span>
+                              )}
+                              {isCredit ? (
+                                <span className="rounded-full bg-success/10 text-success border border-success/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">Credit</span>
+                              ) : isFixedEntry(s) && (
+                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Fixed</span>
+                              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground">{m?.name ?? "Household"}{s.payment_method ? ` · ${s.payment_method}` : ""}{displayNotes ? ` · ${displayNotes}` : ""}</div>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => startEdit(s)}><Pencil className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => removeSpend(s.id)}><Trash2 className="h-4 w-4" /></Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              {filteredSpending.length > 100 && (
+                <div className="py-3 text-center text-xs text-muted-foreground">Showing first 100 entries. Use filters to narrow down.</div>
+              )}
             </div>
           </div>
         </TabsContent>
