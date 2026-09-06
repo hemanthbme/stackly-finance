@@ -558,11 +558,27 @@ function BudgetPage() {
     return arr;
   }, [spending, monthStart]);
 
+  const breakdownMonthStart = useMemo(() => {
+    const [yy, mm] = monthStart.split("-").map(Number);
+    const d = new Date(yy, mm - 1 + breakdownMonthOffset, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  }, [monthStart, breakdownMonthOffset]);
+
+  const breakdownMonthEnd = useMemo(() => {
+    const [yy, mm] = breakdownMonthStart.split("-").map(Number);
+    const d = new Date(yy, mm, 0);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, [breakdownMonthStart]);
+
+  const breakdownMonthLabel = useMemo(() => {
+    return new Date(breakdownMonthStart + "T12:00:00").toLocaleString("default", { month: "long", year: "numeric" });
+  }, [breakdownMonthStart]);
+
   const catBreakdown = useMemo(() => {
     const map = new Map<string, number>();
     for (const s of pureVariableSpending) {
       const d = s.spent_local_date || s.spent_at;
-      if (d < monthStart || d > today) continue;
+      if (d < breakdownMonthStart || d > breakdownMonthEnd) continue;
       map.set(s.category, (map.get(s.category) ?? 0) + s.amount);
     }
     return Array.from(map.entries())
@@ -572,7 +588,17 @@ function BudgetPage() {
         label: allCategories.find((c) => c.value === k)?.label ?? k,
         value: v,
       }));
-  }, [pureVariableSpending, monthStart, today, allCategories]);
+  }, [pureVariableSpending, breakdownMonthStart, breakdownMonthEnd, allCategories]);
+
+  const breakdownCredits = useMemo(() =>
+    creditSpending
+      .filter((s) => { const d = s.spent_local_date || s.spent_at; return d >= breakdownMonthStart && d <= breakdownMonthEnd; })
+      .reduce((sum, s) => sum + s.amount, 0),
+  [creditSpending, breakdownMonthStart, breakdownMonthEnd]);
+
+  const breakdownSpent = catBreakdown.reduce((s, c) => s + c.value, 0);
+  const breakdownNet = breakdownSpent - breakdownCredits;
+  const breakdownEntries = pureVariableSpending.filter((s) => { const d = s.spent_local_date || s.spent_at; return d >= breakdownMonthStart && d <= breakdownMonthEnd; }).length;
   const catMax = Math.max(1, ...catBreakdown.map((c) => c.value));
 
   const PAYMENT_ACCOUNT_CATEGORIES = ["checking", "savings", "credit_card"];
