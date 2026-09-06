@@ -613,6 +613,95 @@ function BudgetPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accounts]);
 
+  // Pace markers — week and month trackers
+  const todayPct = variableDailyLimit ? Math.min(100, (totalVariableToday / variableDailyLimit) * 100) : 0;
+  const todayRemaining = variableDailyLimit - totalVariableToday;
+  const todayOver = todayRemaining < 0;
+  const todayBarColor = !variableDailyLimit ? "bg-muted-foreground" : todayOver ? "bg-destructive" : todayPct >= 80 ? "bg-warning" : "bg-success";
+  const todayTextColor = !variableDailyLimit ? "text-muted-foreground" : todayOver ? "text-destructive" : todayPct >= 80 ? "text-warning" : "text-success";
+
+  const weekDaysElapsed = daysElapsedThisWeek;
+  const weekDaysTotal = 7;
+  const weekExpected = variableWeeklyLimit > 0 ? (variableWeeklyLimit / weekDaysTotal) * weekDaysElapsed : 0;
+  const weekExpectedPct = variableWeeklyLimit > 0 ? Math.min(100, (weekExpected / variableWeeklyLimit) * 100) : 0;
+  const weekActualPct = variableWeeklyLimit > 0 ? Math.min(100, (totalVariableWeek / variableWeeklyLimit) * 100) : 0;
+  const weekRemaining = variableWeeklyLimit - totalVariableWeek;
+  const weekOver = weekRemaining < 0;
+  const weekPaceGap = weekExpected - totalVariableWeek;
+  const weekAhead = weekPaceGap > 0;
+  const weekPaceClose = !weekOver && !weekAhead && Math.abs(weekPaceGap) / Math.max(1, variableWeeklyLimit) < 0.1;
+  const weekBarColor = weekOver ? "bg-destructive" : weekActualPct >= 80 ? "bg-warning" : "bg-success";
+  const weekTextColor = weekOver ? "text-destructive" : weekAhead ? "text-success" : weekPaceClose ? "text-warning" : "text-success";
+
+  const [, , todayDayNum] = today.split("-").map(Number);
+  const [yy2, mm2] = monthStart.split("-").map(Number);
+  const daysInMonth2 = new Date(yy2, mm2, 0).getDate();
+  const monthExpected = variableMonthlyLimit > 0 ? (variableMonthlyLimit / daysInMonth2) * todayDayNum : 0;
+  const monthExpectedPct = variableMonthlyLimit > 0 ? Math.min(100, (monthExpected / variableMonthlyLimit) * 100) : 0;
+  const monthActualPct = variableMonthlyLimit > 0 ? Math.min(100, (totalVariableMonth / variableMonthlyLimit) * 100) : 0;
+  const monthRemaining = variableMonthlyLimit - totalVariableMonth;
+  const monthOver = monthRemaining < 0;
+  const monthPaceGap = monthExpected - totalVariableMonth;
+  const monthAhead = monthPaceGap > 0;
+  const monthBarColor = monthOver ? "bg-destructive" : monthActualPct >= 80 ? "bg-warning" : "bg-success";
+  const monthTextColor = monthOver ? "text-destructive" : monthAhead ? "text-success" : "text-warning";
+
+  // Recent spending — filtered + grouped
+  const filteredSpending = useMemo(() => {
+    const [yy, mm] = monthStart.split("-").map(Number);
+    const prevMonthStartStr = mm === 1 ? `${yy - 1}-12-01` : `${yy}-${String(mm - 1).padStart(2, "0")}-01`;
+
+    return spending.filter((s) => {
+      const d = localDate(s);
+      if (spendTimeFilter === "today" && d !== today) return false;
+      if (spendTimeFilter === "week" && d < weekStart) return false;
+      if (spendTimeFilter === "month" && d < monthStart) return false;
+      if (spendTimeFilter === "lastmonth" && (d < prevMonthStartStr || d >= monthStart)) return false;
+
+      if (spendSearch.trim()) {
+        const q = spendSearch.toLowerCase();
+        const memberName = members.find((m) => m.id === s.member_id)?.name ?? "";
+        const cat = allCategories.find((c) => c.value === s.category)?.label ?? s.category;
+        const matches = [
+          String(s.amount),
+          cat,
+          s.notes ?? "",
+          memberName,
+          s.payment_method ?? "",
+        ].some((v) => v.toLowerCase().includes(q));
+        if (!matches) return false;
+      }
+      return true;
+    });
+  }, [spending, spendTimeFilter, spendSearch, today, weekStart, monthStart, members, allCategories]);
+
+  const filteredSummary = useMemo(() => {
+    const entries = filteredSpending.length;
+    const spent = filteredSpending.filter((s) => !isCreditEntry(s)).reduce((sum, s) => sum + s.amount, 0);
+    const returned = filteredSpending.filter((s) => isCreditEntry(s)).reduce((sum, s) => sum + s.amount, 0);
+    const net = spent - returned;
+    return { entries, spent, returned, net };
+  }, [filteredSpending]);
+
+  const groupedSpending = useMemo(() => {
+    const groups = new Map<string, typeof spending>();
+    for (const s of filteredSpending.slice(0, 100)) {
+      const d = localDate(s);
+      if (!groups.has(d)) groups.set(d, []);
+      groups.get(d)!.push(s);
+    }
+    return Array.from(groups.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [filteredSpending]);
+
+  const formatDateHeader = (iso: string) => {
+    if (iso === today) return `Today — ${new Date(iso + "T12:00:00").toLocaleDateString("default", { month: "short", day: "numeric" })}`;
+    const yesterday = new Date(today + "T12:00:00");
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yestIso = yesterday.toISOString().slice(0, 10);
+    if (iso === yestIso) return `Yesterday — ${new Date(iso + "T12:00:00").toLocaleDateString("default", { month: "short", day: "numeric" })}`;
+    return new Date(iso + "T12:00:00").toLocaleDateString("default", { month: "short", day: "numeric", weekday: "short" });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
