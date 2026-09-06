@@ -692,6 +692,23 @@ function BudgetPage() {
     return new Date(iso + "T12:00:00").toLocaleDateString("default", { month: "short", day: "numeric" });
   };
 
+  const [, , todayDayNum] = today.split("-").map(Number);
+  const [yy2, mm2] = monthStart.split("-").map(Number);
+  const daysInMonth2 = new Date(yy2, mm2, 0).getDate();
+  const weekExpected = variableWeeklyLimit > 0 ? (variableWeeklyLimit / 7) * daysElapsedThisWeek : 0;
+  const weekExpectedPct = variableWeeklyLimit > 0 ? Math.min(100, (weekExpected / variableWeeklyLimit) * 100) : 0;
+  const weekActualPct = variableWeeklyLimit > 0 ? Math.min(100, (totalVariableWeek / variableWeeklyLimit) * 100) : 0;
+  const weekPaceGap = weekExpected - totalVariableWeek;
+  const weekAhead = weekPaceGap > 0;
+  const weekOver = totalVariableWeek > variableWeeklyLimit && variableWeeklyLimit > 0;
+  const monthExpected = variableMonthlyLimit > 0 ? (variableMonthlyLimit / daysInMonth2) * todayDayNum : 0;
+  const monthExpectedPct = variableMonthlyLimit > 0 ? Math.min(100, (monthExpected / variableMonthlyLimit) * 100) : 0;
+  const monthActualPct = variableMonthlyLimit > 0 ? Math.min(100, (totalVariableMonth / variableMonthlyLimit) * 100) : 0;
+  const monthPaceGap = monthExpected - totalVariableMonth;
+  const monthAhead = monthPaceGap > 0;
+  const monthOver = totalVariableMonth > variableMonthlyLimit && variableMonthlyLimit > 0;
+
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
