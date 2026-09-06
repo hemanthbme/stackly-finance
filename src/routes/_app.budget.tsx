@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { fmtMoney, fmtMoneyExact, SPENDING_CATEGORIES } from "@/lib/finance";
 import { toast } from "sonner";
-import { Plus, Trash2, TrendingDown, TrendingUp, Pencil, Save, X, Tag } from "lucide-react";
+import { Plus, Trash2, TrendingDown, TrendingUp, Pencil, Save, X, Tag, Search } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { ForecastEngine } from "@/components/ForecastEngine";
 import { useProfile } from "@/lib/profile-context";
@@ -250,9 +250,9 @@ function BudgetPage() {
   const [sIsFixed, setSIsFixed] = useState(false);
   const [sIsCredit, setSIsCredit] = useState(false);
   const [sCreditCategory, setSCreditCategory] = useState("return_amazon");
-  const [breakdownMonthOffset, setBreakdownMonthOffset] = useState(0);
+  const [breakdownMonth, setBreakdownMonth] = useState(() => monthStart);
   const [spendSearch, setSpendSearch] = useState("");
-  const [spendTimeFilter, setSpendTimeFilter] = useState<"today" | "week" | "month" | "lastmonth" | "all">("all");
+  const [spendTimeFilter, setSpendTimeFilter] = useState<"today" | "week" | "month" | "lastmonth" | "all">("month");
   useEffect(() => { setSDate(today); }, [today]);
   useEffect(() => {
     if (!openSpend) {
@@ -558,27 +558,30 @@ function BudgetPage() {
     return arr;
   }, [spending, monthStart]);
 
-  const breakdownMonthStart = useMemo(() => {
-    const [yy, mm] = monthStart.split("-").map(Number);
-    const d = new Date(yy, mm - 1 + breakdownMonthOffset, 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-  }, [monthStart, breakdownMonthOffset]);
+  const prevBreakdownMonth = () => {
+    const [yy, mm] = breakdownMonth.split("-").map(Number);
+    const d = new Date(yy, mm - 2, 1);
+    setBreakdownMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`);
+  };
+  const nextBreakdownMonth = () => {
+    const [yy, mm] = breakdownMonth.split("-").map(Number);
+    const d = new Date(yy, mm, 1);
+    const next = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+    if (next <= monthStart) setBreakdownMonth(next);
+  };
+  const isCurrentBreakdownMonth = breakdownMonth === monthStart;
 
   const breakdownMonthEnd = useMemo(() => {
-    const [yy, mm] = breakdownMonthStart.split("-").map(Number);
+    const [yy, mm] = breakdownMonth.split("-").map(Number);
     const d = new Date(yy, mm, 0);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  }, [breakdownMonthStart]);
-
-  const breakdownMonthLabel = useMemo(() => {
-    return new Date(breakdownMonthStart + "T12:00:00").toLocaleString("default", { month: "long", year: "numeric" });
-  }, [breakdownMonthStart]);
+  }, [breakdownMonth]);
 
   const catBreakdown = useMemo(() => {
     const map = new Map<string, number>();
     for (const s of pureVariableSpending) {
       const d = s.spent_local_date || s.spent_at;
-      if (d < breakdownMonthStart || d > breakdownMonthEnd) continue;
+      if (d < breakdownMonth || d > breakdownMonthEnd) continue;
       map.set(s.category, (map.get(s.category) ?? 0) + s.amount);
     }
     return Array.from(map.entries())
@@ -588,17 +591,21 @@ function BudgetPage() {
         label: allCategories.find((c) => c.value === k)?.label ?? k,
         value: v,
       }));
-  }, [pureVariableSpending, breakdownMonthStart, breakdownMonthEnd, allCategories]);
+  }, [pureVariableSpending, breakdownMonth, breakdownMonthEnd, allCategories]);
 
-  const breakdownCredits = useMemo(() =>
-    creditSpending
-      .filter((s) => { const d = s.spent_local_date || s.spent_at; return d >= breakdownMonthStart && d <= breakdownMonthEnd; })
-      .reduce((sum, s) => sum + s.amount, 0),
-  [creditSpending, breakdownMonthStart, breakdownMonthEnd]);
+  const breakdownMonthSpent = useMemo(() =>
+    pureVariableSpending.filter((s) => {
+      const d = s.spent_local_date || s.spent_at;
+      return d >= breakdownMonth && d <= breakdownMonthEnd;
+    }).reduce((sum, s) => sum + s.amount, 0),
+  [pureVariableSpending, breakdownMonth, breakdownMonthEnd]);
 
-  const breakdownSpent = catBreakdown.reduce((s, c) => s + c.value, 0);
-  const breakdownNet = breakdownSpent - breakdownCredits;
-  const breakdownEntries = pureVariableSpending.filter((s) => { const d = s.spent_local_date || s.spent_at; return d >= breakdownMonthStart && d <= breakdownMonthEnd; }).length;
+  const breakdownMonthCredits = useMemo(() =>
+    creditSpending.filter((s) => {
+      const d = s.spent_local_date || s.spent_at;
+      return d >= breakdownMonth && d <= breakdownMonthEnd;
+    }).reduce((sum, s) => sum + s.amount, 0),
+  [creditSpending, breakdownMonth, breakdownMonthEnd]);
   const catMax = Math.max(1, ...catBreakdown.map((c) => c.value));
 
   const PAYMENT_ACCOUNT_CATEGORIES = ["checking", "savings", "credit_card"];
@@ -614,70 +621,61 @@ function BudgetPage() {
   }, [accounts]);
 
   // Pace markers — week and month trackers
-  const todayPct = variableDailyLimit ? Math.min(100, (totalVariableToday / variableDailyLimit) * 100) : 0;
-  const todayRemaining = variableDailyLimit - totalVariableToday;
-  const todayOver = todayRemaining < 0;
-  const todayBarColor = !variableDailyLimit ? "bg-muted-foreground" : todayOver ? "bg-destructive" : todayPct >= 80 ? "bg-warning" : "bg-success";
-  const todayTextColor = !variableDailyLimit ? "text-muted-foreground" : todayOver ? "text-destructive" : todayPct >= 80 ? "text-warning" : "text-success";
+  const [yy, mm, dd] = today.split("-").map(Number);
+  const daysInMonth = new Date(yy, mm, 0).getDate();
+  const dayOfMonth = dd;
+  const expectedMonthSpend = variableMonthlyLimit > 0 ? (variableMonthlyLimit / daysInMonth) * dayOfMonth : 0;
+  const expectedMonthPct = variableMonthlyLimit > 0 ? Math.min(100, (expectedMonthSpend / variableMonthlyLimit) * 100) : 0;
+  const monthPaceAhead = totalVariableMonth <= expectedMonthSpend;
+  const monthPaceDiff = Math.abs(expectedMonthSpend - totalVariableMonth);
+  const monthPaceStatus = variableMonthlyLimit === 0 ? "none" : totalVariableMonth > expectedMonthSpend * 1.1 ? "behind" : totalVariableMonth > expectedMonthSpend * 1.0 ? "close" : "ahead";
 
-  const [, , todayDayNum] = today.split("-").map(Number);
-  const [yy2, mm2] = monthStart.split("-").map(Number);
-  const daysInMonth2 = new Date(yy2, mm2, 0).getDate();
-
-  const weekExpected = variableWeeklyLimit > 0 ? (variableWeeklyLimit / 7) * daysElapsedThisWeek : 0;
-  const weekExpectedPct = variableWeeklyLimit > 0 ? Math.min(100, (weekExpected / variableWeeklyLimit) * 100) : 0;
-  const weekActualPct = variableWeeklyLimit > 0 ? Math.min(100, (totalVariableWeek / variableWeeklyLimit) * 100) : 0;
-  const weekPaceGap = weekExpected - totalVariableWeek;
-  const weekAhead = weekPaceGap > 0;
-  const weekOver = totalVariableWeek > variableWeeklyLimit && variableWeeklyLimit > 0;
-
-  const monthExpected = variableMonthlyLimit > 0 ? (variableMonthlyLimit / daysInMonth2) * todayDayNum : 0;
-  const monthExpectedPct = variableMonthlyLimit > 0 ? Math.min(100, (monthExpected / variableMonthlyLimit) * 100) : 0;
-  const monthActualPct = variableMonthlyLimit > 0 ? Math.min(100, (totalVariableMonth / variableMonthlyLimit) * 100) : 0;
-  const monthPaceGap = monthExpected - totalVariableMonth;
-  const monthAhead = monthPaceGap > 0;
-  const monthOver = totalVariableMonth > variableMonthlyLimit && variableMonthlyLimit > 0;
+  const expectedWeekSpendPace = variableWeeklyLimit > 0 ? (variableWeeklyLimit / 7) * daysElapsedThisWeek : 0;
+  const expectedWeekPct = variableWeeklyLimit > 0 ? Math.min(100, (expectedWeekSpendPace / variableWeeklyLimit) * 100) : 0;
+  const weekPaceStatus = variableWeeklyLimit === 0 ? "none" : totalVariableWeek > expectedWeekSpendPace * 1.1 ? "behind" : totalVariableWeek > expectedWeekSpendPace * 1.0 ? "close" : "ahead";
+  const weekPaceDiff = Math.abs(expectedWeekSpendPace - totalVariableWeek);
 
   // Recent spending — filtered + grouped
   const filteredSpending = useMemo(() => {
     const [yy, mm] = monthStart.split("-").map(Number);
-    const prevMonthStartStr = mm === 1 ? `${yy - 1}-12-01` : `${yy}-${String(mm - 1).padStart(2, "0")}-01`;
+    const prevMonthStart = mm === 1 ? `${yy - 1}-12-01` : `${yy}-${String(mm - 1).padStart(2, "0")}-01`;
 
-    return spending.filter((s) => {
-      const d = localDate(s);
-      if (spendTimeFilter === "today" && d !== today) return false;
-      if (spendTimeFilter === "week" && d < weekStart) return false;
-      if (spendTimeFilter === "month" && d < monthStart) return false;
-      if (spendTimeFilter === "lastmonth" && (d < prevMonthStartStr || d >= monthStart)) return false;
+    let entries = [...spending];
 
-      if (spendSearch.trim()) {
-        const q = spendSearch.toLowerCase();
-        const memberName = members.find((m) => m.id === s.member_id)?.name ?? "";
+    if (spendTimeFilter === "today") entries = entries.filter((s) => localDate(s) === today);
+    else if (spendTimeFilter === "week") entries = entries.filter((s) => localDate(s) >= weekStart && localDate(s) <= today);
+    else if (spendTimeFilter === "month") entries = entries.filter((s) => localDate(s) >= monthStart && localDate(s) <= today);
+    else if (spendTimeFilter === "lastmonth") entries = entries.filter((s) => localDate(s) >= prevMonthStart && localDate(s) < monthStart);
+
+    if (spendSearch.trim()) {
+      const q = spendSearch.toLowerCase();
+      entries = entries.filter((s) => {
         const cat = allCategories.find((c) => c.value === s.category)?.label ?? s.category;
-        const matches = [
-          String(s.amount),
-          cat,
-          s.notes ?? "",
-          memberName,
-          s.payment_method ?? "",
-        ].some((v) => v.toLowerCase().includes(q));
-        if (!matches) return false;
-      }
-      return true;
-    });
-  }, [spending, spendTimeFilter, spendSearch, today, weekStart, monthStart, members, allCategories]);
+        const member = members.find((m) => m.id === s.member_id)?.name ?? "";
+        return (
+          String(s.amount).includes(q) ||
+          cat.toLowerCase().includes(q) ||
+          (s.notes ?? "").toLowerCase().includes(q) ||
+          member.toLowerCase().includes(q) ||
+          (s.payment_method ?? "").toLowerCase().includes(q)
+        );
+      });
+    }
 
-  const filteredSummary = useMemo(() => {
-    const entries = filteredSpending.length;
-    const spent = filteredSpending.filter((s) => !isCreditEntry(s)).reduce((sum, s) => sum + s.amount, 0);
-    const returned = filteredSpending.filter((s) => isCreditEntry(s)).reduce((sum, s) => sum + s.amount, 0);
-    const net = spent - returned;
-    return { entries, spent, returned, net };
+    return entries;
+  }, [spending, spendTimeFilter, spendSearch, today, weekStart, monthStart, allCategories, members]);
+
+  const spendingSummary = useMemo(() => {
+    const variable = filteredSpending.filter((s) => !isFixedEntry(s) && !isCreditEntry(s));
+    const credits = filteredSpending.filter((s) => isCreditEntry(s));
+    const spent = variable.reduce((s, x) => s + x.amount, 0);
+    const returned = credits.reduce((s, x) => s + x.amount, 0);
+    return { count: filteredSpending.length, spent, returned, net: spent - returned };
   }, [filteredSpending]);
 
   const groupedSpending = useMemo(() => {
     const groups = new Map<string, typeof spending>();
-    for (const s of filteredSpending.slice(0, 100)) {
+    for (const s of filteredSpending) {
       const d = localDate(s);
       if (!groups.has(d)) groups.set(d, []);
       groups.get(d)!.push(s);
@@ -685,13 +683,13 @@ function BudgetPage() {
     return Array.from(groups.entries()).sort((a, b) => b[0].localeCompare(a[0]));
   }, [filteredSpending]);
 
-  const formatDateHeader = (iso: string) => {
-    if (iso === today) return `Today — ${new Date(iso + "T12:00:00").toLocaleDateString("default", { month: "short", day: "numeric" })}`;
+  const formatDateLabel = (iso: string) => {
+    if (iso === today) return "Today";
     const yesterday = new Date(today + "T12:00:00");
     yesterday.setDate(yesterday.getDate() - 1);
-    const yestIso = yesterday.toISOString().slice(0, 10);
-    if (iso === yestIso) return `Yesterday — ${new Date(iso + "T12:00:00").toLocaleDateString("default", { month: "short", day: "numeric" })}`;
-    return new Date(iso + "T12:00:00").toLocaleDateString("default", { month: "short", day: "numeric", weekday: "short" });
+    const yest = yesterday.toISOString().slice(0, 10);
+    if (iso === yest) return "Yesterday";
+    return new Date(iso + "T12:00:00").toLocaleDateString("default", { month: "short", day: "numeric" });
   };
 
   return (
@@ -983,76 +981,58 @@ function BudgetPage() {
                   )}
                 </div>
                 <div className="space-y-4 mt-4">
-                  <div key="today">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-medium">Today</span>
-                      <span className="text-xs text-muted-foreground">{fmtMoney(totalVariableToday)} of {variableDailyLimit ? fmtMoney(variableDailyLimit) : "—"}</span>
+                  {[
+                    { label: "Today", spent: totalVariableToday, limit: variableDailyLimit, showPace: false, expectedPct: undefined, paceStatus: undefined, paceDiff: undefined, paceLabel: undefined },
+                    { label: "This week", spent: totalVariableWeek, limit: variableWeeklyLimit, showPace: true, expectedPct: expectedWeekPct, paceStatus: weekPaceStatus, paceDiff: weekPaceDiff, paceLabel: `expected ${fmtMoney(expectedWeekSpendPace)} · day ${daysElapsedThisWeek} of 7` },
+                    { label: "This month", spent: totalVariableMonth, limit: variableMonthlyLimit, showPace: true, expectedPct: expectedMonthPct, paceStatus: monthPaceStatus, paceDiff: monthPaceDiff, paceLabel: `expected ${fmtMoney(expectedMonthSpend)} · day ${dayOfMonth} of ${daysInMonth}` },
+                  ].map(({ label, spent, limit, showPace, expectedPct, paceStatus, paceDiff, paceLabel }) => {
+                    const pct = limit ? Math.min(100, (spent / limit) * 100) : 0;
+                    const remaining = limit - spent;
+                    const over = remaining < 0;
+                    const barColor = !limit ? "bg-muted-foreground" : over ? "bg-destructive" : pct >= 80 ? "bg-warning" : "bg-success";
+                    const textColor = !limit ? "text-muted-foreground" : over ? "text-destructive" : pct >= 80 ? "text-warning" : "text-success";
+                    return (
+                      <div key={label}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-sm font-medium">{label}</span>
+                          <span className="text-xs text-muted-foreground">{fmtMoney(spent)} of {limit ? fmtMoney(limit) : "—"}</span>
+                        </div>
+                        <div className="h-2.5 overflow-visible rounded-full bg-muted relative">
+                          <div className={`h-full transition-all rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                          {showPace && limit > 0 && expectedPct !== undefined && (
+                            <div
+                              className="absolute top-[-4px] w-[2.5px] h-[18px] rounded-sm bg-foreground/40 z-10"
+                              style={{ left: `${expectedPct}%` }}
+                            />
+                          )}
+                        </div>
+                        <div className="mt-1 flex items-center justify-between">
+                          <div className={`text-xs font-medium ${textColor}`}>
+                            {!limit ? "No limit set" : over ? `Over by ${fmtMoney(Math.abs(remaining))}` :
+                              showPace && paceStatus && paceStatus !== "none" ? (
+                                paceStatus === "behind" ? `${fmtMoney(paceDiff!)} behind pace` :
+                                paceStatus === "close" ? `On pace — ${fmtMoney(remaining)} left` :
+                                `${fmtMoney(paceDiff!)} ahead of pace`
+                              ) : `${fmtMoney(remaining)} left`
+                            }
+                          </div>
+                          {showPace && limit > 0 && paceLabel && (
+                            <div className="text-[11px] text-muted-foreground">{paceLabel}</div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {(variableWeeklyLimit > 0 || variableMonthlyLimit > 0) && (
+                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border flex-wrap">
+                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <div className="w-5 h-1.5 rounded-full bg-success" />Actual spend
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <div className="w-[3px] h-3.5 rounded-sm bg-foreground/40" />Where you should be
+                      </div>
                     </div>
-                    <div className="h-2.5 overflow-hidden rounded-full bg-muted">
-                      <div className={`h-full transition-all ${todayBarColor}`} style={{ width: `${todayPct}%` }} />
-                    </div>
-                    <div className={`mt-1 text-xs font-medium ${todayTextColor}`}>
-                      {!variableDailyLimit ? "No limit set" : todayOver ? `Over by ${fmtMoney(Math.abs(todayRemaining))}` : `${fmtMoney(todayRemaining)} left today`}
-                    </div>
-                  </div>
-                  <div key="week">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-medium">This week</span>
-                      <span className="text-xs text-muted-foreground">{fmtMoney(totalVariableWeek)} of {variableWeeklyLimit ? fmtMoney(variableWeeklyLimit) : "—"}</span>
-                    </div>
-                    <div className="relative h-2.5 overflow-visible rounded-full bg-muted">
-                      <div
-                        className={`h-full rounded-full transition-all ${weekOver ? "bg-destructive" : weekActualPct >= 80 ? "bg-warning" : "bg-success"}`}
-                        style={{ width: `${weekActualPct}%` }}
-                      />
-                      {variableWeeklyLimit > 0 && (
-                        <div
-                          className="absolute top-[-4px] w-[2.5px] h-[18px] rounded-sm bg-foreground/40 z-10 pointer-events-none"
-                          style={{ left: `clamp(0%, ${weekExpectedPct}%, calc(100% - 2.5px))` }}
-                        />
-                      )}
-                    </div>
-                    <div className="mt-1 flex items-center justify-between">
-                      <span className={`text-xs font-medium ${weekOver ? "text-destructive" : weekAhead ? "text-success" : "text-warning"}`}>
-                        {!variableWeeklyLimit ? "No limit set"
-                          : weekOver ? `Over by ${fmtMoney(Math.abs(variableWeeklyLimit - totalVariableWeek))}`
-                          : weekAhead ? `${fmtMoney(weekPaceGap)} ahead of pace`
-                          : `${fmtMoney(Math.abs(weekPaceGap))} behind pace`}
-                      </span>
-                      {variableWeeklyLimit > 0 && (
-                        <span className="text-xs text-muted-foreground">expected {fmtMoney(weekExpected)} · day {daysElapsedThisWeek} of 7</span>
-                      )}
-                    </div>
-                  </div>
-                  <div key="month">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-medium">This month</span>
-                      <span className="text-xs text-muted-foreground">{fmtMoney(totalVariableMonth)} of {variableMonthlyLimit ? fmtMoney(variableMonthlyLimit) : "—"}</span>
-                    </div>
-                    <div className="relative h-2.5 overflow-visible rounded-full bg-muted">
-                      <div
-                        className={`h-full rounded-full transition-all ${monthOver ? "bg-destructive" : monthActualPct >= 80 ? "bg-warning" : "bg-success"}`}
-                        style={{ width: `${monthActualPct}%` }}
-                      />
-                      {variableMonthlyLimit > 0 && (
-                        <div
-                          className="absolute top-[-4px] w-[2.5px] h-[18px] rounded-sm bg-foreground/40 z-10 pointer-events-none"
-                          style={{ left: `clamp(0%, ${monthExpectedPct}%, calc(100% - 2.5px))` }}
-                        />
-                      )}
-                    </div>
-                    <div className="mt-1 flex items-center justify-between">
-                      <span className={`text-xs font-medium ${monthOver ? "text-destructive" : monthAhead ? "text-success" : "text-warning"}`}>
-                        {!variableMonthlyLimit ? "No limit set"
-                          : monthOver ? `Over by ${fmtMoney(Math.abs(variableMonthlyLimit - totalVariableMonth))}`
-                          : monthAhead ? `${fmtMoney(monthPaceGap)} ahead of pace`
-                          : `${fmtMoney(Math.abs(monthPaceGap))} behind pace`}
-                      </span>
-                      {variableMonthlyLimit > 0 && (
-                        <span className="text-xs text-muted-foreground">expected {fmtMoney(monthExpected)} · day {todayDayNum} of {daysInMonth2}</span>
-                      )}
-                    </div>
-                  </div>
+                  )}
                 </div>
                 {(totalCreditsToday > 0 || totalCreditsWeek > 0 || totalCreditsMonth > 0) && (
                   <div className="border-t border-border pt-3 mt-4">
@@ -1063,16 +1043,6 @@ function BudgetPage() {
                     <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
                       {totalCreditsToday > 0 && <span>Today: +{fmtMoney(totalCreditsToday)}</span>}
                       {totalCreditsWeek > 0 && <span>This week: +{fmtMoney(totalCreditsWeek)}</span>}
-                    </div>
-                  </div>
-                )}
-                {(variableWeeklyLimit > 0 || variableMonthlyLimit > 0) && (
-                  <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border flex-wrap">
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <div className="w-4 h-1.5 rounded-full bg-success" />Actual spend
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <div className="w-0.5 h-3.5 rounded-sm bg-foreground/40" />Where you should be
                     </div>
                   </div>
                 )}
@@ -1208,22 +1178,36 @@ function BudgetPage() {
               <h3 className="font-display text-lg font-semibold">Spending breakdown</h3>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setBreakdownMonthOffset((o) => o - 1)}
+                  onClick={prevBreakdownMonth}
                   className="rounded-lg border border-border bg-muted/30 px-2.5 py-1 text-sm hover:bg-muted transition-colors"
                 >←</button>
-                <span className="text-sm font-medium min-w-[130px] text-center">{breakdownMonthLabel}</span>
+                <span className="text-sm font-medium min-w-[130px] text-center">
+                  {new Date(breakdownMonth + "T12:00:00").toLocaleString("default", { month: "long", year: "numeric" })}
+                </span>
                 <button
-                  onClick={() => setBreakdownMonthOffset((o) => Math.min(0, o + 1))}
-                  disabled={breakdownMonthOffset === 0}
+                  onClick={nextBreakdownMonth}
+                  disabled={isCurrentBreakdownMonth}
                   className="rounded-lg border border-border bg-muted/30 px-2.5 py-1 text-sm hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >→</button>
               </div>
             </div>
-            <div className="flex gap-5 mt-2 mb-1 flex-wrap">
-              <div><div className="text-xs text-muted-foreground">Spent</div><div className="text-base font-semibold">{fmtMoney(breakdownSpent)}</div></div>
-              {breakdownCredits > 0 && <div><div className="text-xs text-muted-foreground">Returned</div><div className="text-base font-semibold text-success">+{fmtMoney(breakdownCredits)}</div></div>}
-              {breakdownCredits > 0 && <div><div className="text-xs text-muted-foreground">Net</div><div className="text-base font-semibold text-primary">{fmtMoney(breakdownNet)}</div></div>}
-              <div><div className="text-xs text-muted-foreground">Entries</div><div className="text-base font-semibold">{breakdownEntries}</div></div>
+            <div className="flex gap-4 mt-2 mb-1 flex-wrap">
+              <div className="flex flex-col">
+                <span className="text-xs text-muted-foreground">Spent</span>
+                <span className="text-sm font-medium">{fmtMoney(breakdownMonthSpent)}</span>
+              </div>
+              {breakdownMonthCredits > 0 && (
+                <div className="flex flex-col">
+                  <span className="text-xs text-muted-foreground">Returned</span>
+                  <span className="text-sm font-medium text-success">+{fmtMoney(breakdownMonthCredits)}</span>
+                </div>
+              )}
+              {breakdownMonthCredits > 0 && (
+                <div className="flex flex-col">
+                  <span className="text-xs text-muted-foreground">Net</span>
+                  <span className="text-sm font-medium text-primary">{fmtMoney(breakdownMonthSpent - breakdownMonthCredits)}</span>
+                </div>
+              )}
             </div>
             {catBreakdown.length === 0 ? (
               <div className="py-6 text-center text-sm text-muted-foreground">Nothing logged yet.</div>
@@ -1294,166 +1278,131 @@ function BudgetPage() {
           <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
             <h3 className="font-display text-lg font-semibold mb-3">Recent spending</h3>
 
-            {/* Search */}
             <div className="flex gap-2 mb-3">
-              <div className="relative flex-1">
+              <div className="flex-1 flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
+                <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <input
-                  type="text"
                   value={spendSearch}
                   onChange={(e) => setSpendSearch(e.target.value)}
                   placeholder="Search amount, category, notes..."
-                  className="w-full rounded-lg border border-border bg-muted/30 px-3 py-2 pl-8 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                 />
-                <span className="absolute left-2.5 top-2.5 text-muted-foreground pointer-events-none">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-                </span>
+                {spendSearch && (
+                  <button onClick={() => setSpendSearch("")} className="text-muted-foreground hover:text-foreground">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
-              {spendSearch && (
-                <Button variant="ghost" size="sm" onClick={() => setSpendSearch("")} className="px-2">✕</Button>
-              )}
             </div>
 
-            {/* Time filters */}
             <div className="flex gap-1.5 mb-3 flex-wrap">
-              {([
-                { key: "today", label: "Today" },
-                { key: "week", label: "This week" },
-                { key: "month", label: "This month" },
-                { key: "lastmonth", label: "Last month" },
-                { key: "all", label: "All" },
-              ] as const).map(({ key, label }) => (
+              {(["today", "week", "month", "lastmonth", "all"] as const).map((f) => (
                 <button
-                  key={key}
-                  onClick={() => setSpendTimeFilter(key)}
-                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                    spendTimeFilter === key
+                  key={f}
+                  onClick={() => setSpendTimeFilter(f)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors border ${
+                    spendTimeFilter === f
                       ? "bg-gradient-primary text-primary-foreground border-transparent"
-                      : "border-border bg-card text-muted-foreground hover:bg-muted"
+                      : "bg-card border-border text-muted-foreground hover:bg-muted"
                   }`}
                 >
-                  {label}
+                  {f === "today" ? "Today" : f === "week" ? "This week" : f === "month" ? "This month" : f === "lastmonth" ? "Last month" : "All"}
                 </button>
               ))}
             </div>
 
-            {/* Summary */}
-            {filteredSpending.length > 0 && (
-              <div className="flex gap-4 mb-3 px-3 py-2 rounded-lg bg-muted/30 flex-wrap text-xs">
-                <span className="text-muted-foreground"><span className="font-medium text-foreground">{filteredSummary.entries}</span> entries</span>
-                <span className="text-muted-foreground"><span className="font-medium text-foreground">{fmtMoney(filteredSummary.spent)}</span> spent</span>
-                {filteredSummary.returned > 0 && (
-                  <span className="text-muted-foreground"><span className="font-medium text-success">+{fmtMoney(filteredSummary.returned)}</span> returned</span>
-                )}
-                {filteredSummary.returned > 0 && (
-                  <span className="text-muted-foreground"><span className="font-medium text-primary">{fmtMoney(filteredSummary.net)}</span> net</span>
-                )}
-              </div>
-            )}
+            <div className="flex gap-4 mb-3 px-3 py-2 rounded-lg bg-muted/30 text-xs flex-wrap">
+              <span className="text-muted-foreground"><span className="font-medium text-foreground">{spendingSummary.count}</span> entries</span>
+              <span className="text-muted-foreground"><span className="font-medium text-foreground">{fmtMoney(spendingSummary.spent)}</span> spent</span>
+              {spendingSummary.returned > 0 && (
+                <span className="text-success"><span className="font-medium">+{fmtMoney(spendingSummary.returned)}</span> returned</span>
+              )}
+              {spendingSummary.returned > 0 && (
+                <span className="text-muted-foreground"><span className="font-medium text-foreground">{fmtMoney(spendingSummary.net)}</span> net</span>
+              )}
+            </div>
 
-            {/* Grouped entries */}
-            <div className="max-h-[32rem] space-y-1 overflow-auto">
+            <div className="max-h-[32rem] overflow-auto space-y-1 pr-1">
               {groupedSpending.length === 0 && (
                 <div className="py-8 text-center text-sm text-muted-foreground">
-                  {spendSearch ? `No entries matching "${spendSearch}"` : "No spending in this period."}
+                  {spendSearch ? "No entries match your search." : "No spending in this period."}
                 </div>
               )}
               {groupedSpending.map(([date, entries]) => (
                 <div key={date}>
-                  <div className="sticky top-0 bg-card/95 backdrop-blur-sm px-1 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider z-10">
-                    {formatDateHeader(date)}
+                  <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider py-1.5 px-1 mt-2 first:mt-0">
+                    {formatDateLabel(date)}
                   </div>
-                  <div className="space-y-1">
-                    {entries.map((s) => {
-                      const isEdit = editingId === s.id;
-                      const cat = SPENDING_CATEGORIES.find((c) => c.value === s.category)?.label ?? s.category;
-                      const m = members.find((m) => m.id === s.member_id);
-                      if (isEdit) {
-                        return (
-                          <div key={s.id} className="rounded-lg border border-primary/40 bg-muted/30 p-3">
-                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                              <div className="space-y-1"><Label className="text-xs">Amount</Label>
-                                <Input inputMode="decimal" value={String(editDraft.amount ?? "")} onChange={(e) => setEditDraft({ ...editDraft, amount: Number(e.target.value) })} />
-                              </div>
-                              <div className="space-y-1"><Label className="text-xs">Date</Label>
-                                <Input type="date" value={(editDraft.spent_at as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, spent_at: e.target.value })} />
-                              </div>
-                              <div className="space-y-1"><Label className="text-xs">Category</Label>
-                                <Select value={(editDraft.category as string) ?? "other"} onValueChange={(v) => setEditDraft({ ...editDraft, category: v })}>
-                                  <SelectTrigger><SelectValue /></SelectTrigger>
-                                  <SelectContent>{SPENDING_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
-                                </Select>
-                              </div>
-                              <div className="space-y-1"><Label className="text-xs">Member</Label>
-                                <Select value={(editDraft.member_id as string) || "none"} onValueChange={(v) => setEditDraft({ ...editDraft, member_id: v === "none" ? null : v })}>
-                                  <SelectTrigger><SelectValue /></SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="none">Household</SelectItem>
-                                    {members.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="space-y-1"><Label className="text-xs">Payment</Label>
-                                {paymentMethodOptions.length > 0 ? (
-                                  <Select
-                                    value={paymentMethodOptions.find((p) => p.label === editDraft.payment_method)?.value || "none"}
-                                    onValueChange={(v) => {
-                                      const resolved = v === "none" ? null : (paymentMethodOptions.find((p) => p.value === v)?.label ?? null);
-                                      setEditDraft({ ...editDraft, payment_method: resolved });
-                                    }}
-                                  >
-                                    <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="none">— Not specified —</SelectItem>
-                                      {paymentMethodOptions.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
-                                    </SelectContent>
-                                  </Select>
-                                ) : (
-                                  <Input value={(editDraft.payment_method as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, payment_method: e.target.value })} placeholder="Payment method" />
-                                )}
-                              </div>
-                              <div className="space-y-1"><Label className="text-xs">Notes</Label>
-                                <Input value={(editDraft.notes as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, notes: e.target.value })} />
-                              </div>
-                            </div>
-                            <div className="mt-3 flex gap-2">
-                              <Button size="sm" onClick={saveEdit} className="bg-gradient-primary"><Save className="mr-1 h-3 w-3" />Save</Button>
-                              <Button size="sm" variant="ghost" onClick={cancelEdit}><X className="mr-1 h-3 w-3" />Cancel</Button>
-                            </div>
-                          </div>
-                        );
-                      }
-                      const isCredit = isCreditEntry(s);
-                      const displayNotes = isCredit ? stripCreditPrefix(s.notes) : stripFixedPrefix(s.notes);
+                  {entries.map((s) => {
+                    const isEdit = editingId === s.id;
+                    const cat = allCategories.find((c) => c.value === s.category)?.label ?? s.category;
+                    const m = members.find((m) => m.id === s.member_id);
+                    if (isEdit) {
                       return (
-                        <div key={s.id} className={`flex items-center justify-between rounded-lg border px-3 py-2 ${isCredit ? "border-success/20 bg-success/5" : "border-border bg-muted/20"}`}>
-                          <div>
-                            <div className="text-sm font-medium flex items-center gap-2">
-                              {isCredit ? (
-                                <span className="text-success">+{fmtMoneyExact(s.amount)}</span>
-                              ) : (
-                                <span>{fmtMoneyExact(s.amount)} <span className="text-xs text-muted-foreground">· {cat}</span></span>
-                              )}
-                              {isCredit ? (
-                                <span className="rounded-full bg-success/10 text-success border border-success/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">Credit</span>
-                              ) : isFixedEntry(s) && (
-                                <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Fixed</span>
-                              )}
+                        <div key={s.id} className="rounded-lg border border-primary/40 bg-muted/30 p-3 mb-1">
+                          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            <div className="space-y-1"><Label className="text-xs">Amount</Label>
+                              <Input inputMode="decimal" value={String(editDraft.amount ?? "")} onChange={(e) => setEditDraft({ ...editDraft, amount: Number(e.target.value) })} />
                             </div>
-                            <div className="text-xs text-muted-foreground">{m?.name ?? "Household"}{s.payment_method ? ` · ${s.payment_method}` : ""}{displayNotes ? ` · ${displayNotes}` : ""}</div>
+                            <div className="space-y-1"><Label className="text-xs">Date</Label>
+                              <Input type="date" value={(editDraft.spent_at as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, spent_at: e.target.value })} />
+                            </div>
+                            <div className="space-y-1"><Label className="text-xs">Category</Label>
+                              <Select value={(editDraft.category as string) ?? "other"} onValueChange={(v) => setEditDraft({ ...editDraft, category: v })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>{SPENDING_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1"><Label className="text-xs">Member</Label>
+                              <Select value={(editDraft.member_id as string) || "none"} onValueChange={(v) => setEditDraft({ ...editDraft, member_id: v === "none" ? null : v })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">Household</SelectItem>
+                                  {members.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1"><Label className="text-xs">Notes</Label>
+                              <Input value={(editDraft.notes as string) ?? ""} onChange={(e) => setEditDraft({ ...editDraft, notes: e.target.value })} />
+                            </div>
                           </div>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => startEdit(s)}><Pencil className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="icon" onClick={() => removeSpend(s.id)}><Trash2 className="h-4 w-4" /></Button>
+                          <div className="mt-3 flex gap-2">
+                            <Button size="sm" onClick={saveEdit} className="bg-gradient-primary"><Save className="mr-1 h-3 w-3" />Save</Button>
+                            <Button size="sm" variant="ghost" onClick={cancelEdit}><X className="mr-1 h-3 w-3" />Cancel</Button>
                           </div>
                         </div>
                       );
-                    })}
-                  </div>
+                    }
+                    const isCredit = isCreditEntry(s);
+                    const displayNotes = isCredit ? stripCreditPrefix(s.notes) : stripFixedPrefix(s.notes);
+                    return (
+                      <div key={s.id} className={`flex items-center justify-between rounded-lg border px-3 py-2 mb-1 ${isCredit ? "border-success/20 bg-success/5" : "border-border bg-muted/20"}`}>
+                        <div>
+                          <div className="text-sm font-medium flex items-center gap-2 flex-wrap">
+                            {isCredit ? (
+                              <span className="text-success">+{fmtMoneyExact(s.amount)}</span>
+                            ) : (
+                              <span>{fmtMoneyExact(s.amount)} <span className="text-xs text-muted-foreground">· {cat}</span></span>
+                            )}
+                            {isCredit ? (
+                              <span className="rounded-full bg-success/10 text-success border border-success/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">Credit</span>
+                            ) : isFixedEntry(s) && (
+                              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Fixed</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {m?.name ?? "Household"}{s.payment_method ? ` · ${s.payment_method}` : ""}{displayNotes ? ` · ${displayNotes}` : ""}
+                          </div>
+                        </div>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <Button variant="ghost" size="icon" onClick={() => startEdit(s)}><Pencil className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => removeSpend(s.id)}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ))}
-              {filteredSpending.length > 100 && (
-                <div className="py-3 text-center text-xs text-muted-foreground">Showing first 100 entries. Use filters to narrow down.</div>
-              )}
             </div>
           </div>
         </TabsContent>
