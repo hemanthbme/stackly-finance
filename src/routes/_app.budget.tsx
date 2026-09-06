@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { fmtMoney, fmtMoneyExact, SPENDING_CATEGORIES } from "@/lib/finance";
 import { toast } from "sonner";
-import { Plus, Trash2, TrendingDown, TrendingUp, Pencil, Save, X, Tag } from "lucide-react";
+import { Plus, Trash2, TrendingDown, TrendingUp, Pencil, Save, X, Tag, Search } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { ForecastEngine } from "@/components/ForecastEngine";
 import { useProfile } from "@/lib/profile-context";
@@ -250,9 +250,9 @@ function BudgetPage() {
   const [sIsFixed, setSIsFixed] = useState(false);
   const [sIsCredit, setSIsCredit] = useState(false);
   const [sCreditCategory, setSCreditCategory] = useState("return_amazon");
-  const [breakdownMonthOffset, setBreakdownMonthOffset] = useState(0);
+  const [breakdownMonth, setBreakdownMonth] = useState(() => monthStart);
   const [spendSearch, setSpendSearch] = useState("");
-  const [spendTimeFilter, setSpendTimeFilter] = useState<"today" | "week" | "month" | "lastmonth" | "all">("all");
+  const [spendTimeFilter, setSpendTimeFilter] = useState<"today" | "week" | "month" | "lastmonth" | "all">("month");
   useEffect(() => { setSDate(today); }, [today]);
   useEffect(() => {
     if (!openSpend) {
@@ -558,27 +558,30 @@ function BudgetPage() {
     return arr;
   }, [spending, monthStart]);
 
-  const breakdownMonthStart = useMemo(() => {
-    const [yy, mm] = monthStart.split("-").map(Number);
-    const d = new Date(yy, mm - 1 + breakdownMonthOffset, 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-  }, [monthStart, breakdownMonthOffset]);
+  const prevBreakdownMonth = () => {
+    const [yy, mm] = breakdownMonth.split("-").map(Number);
+    const d = new Date(yy, mm - 2, 1);
+    setBreakdownMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`);
+  };
+  const nextBreakdownMonth = () => {
+    const [yy, mm] = breakdownMonth.split("-").map(Number);
+    const d = new Date(yy, mm, 1);
+    const next = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+    if (next <= monthStart) setBreakdownMonth(next);
+  };
+  const isCurrentBreakdownMonth = breakdownMonth === monthStart;
 
   const breakdownMonthEnd = useMemo(() => {
-    const [yy, mm] = breakdownMonthStart.split("-").map(Number);
+    const [yy, mm] = breakdownMonth.split("-").map(Number);
     const d = new Date(yy, mm, 0);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  }, [breakdownMonthStart]);
-
-  const breakdownMonthLabel = useMemo(() => {
-    return new Date(breakdownMonthStart + "T12:00:00").toLocaleString("default", { month: "long", year: "numeric" });
-  }, [breakdownMonthStart]);
+  }, [breakdownMonth]);
 
   const catBreakdown = useMemo(() => {
     const map = new Map<string, number>();
     for (const s of pureVariableSpending) {
       const d = s.spent_local_date || s.spent_at;
-      if (d < breakdownMonthStart || d > breakdownMonthEnd) continue;
+      if (d < breakdownMonth || d > breakdownMonthEnd) continue;
       map.set(s.category, (map.get(s.category) ?? 0) + s.amount);
     }
     return Array.from(map.entries())
@@ -588,17 +591,21 @@ function BudgetPage() {
         label: allCategories.find((c) => c.value === k)?.label ?? k,
         value: v,
       }));
-  }, [pureVariableSpending, breakdownMonthStart, breakdownMonthEnd, allCategories]);
+  }, [pureVariableSpending, breakdownMonth, breakdownMonthEnd, allCategories]);
 
-  const breakdownCredits = useMemo(() =>
-    creditSpending
-      .filter((s) => { const d = s.spent_local_date || s.spent_at; return d >= breakdownMonthStart && d <= breakdownMonthEnd; })
-      .reduce((sum, s) => sum + s.amount, 0),
-  [creditSpending, breakdownMonthStart, breakdownMonthEnd]);
+  const breakdownMonthSpent = useMemo(() =>
+    pureVariableSpending.filter((s) => {
+      const d = s.spent_local_date || s.spent_at;
+      return d >= breakdownMonth && d <= breakdownMonthEnd;
+    }).reduce((sum, s) => sum + s.amount, 0),
+  [pureVariableSpending, breakdownMonth, breakdownMonthEnd]);
 
-  const breakdownSpent = catBreakdown.reduce((s, c) => s + c.value, 0);
-  const breakdownNet = breakdownSpent - breakdownCredits;
-  const breakdownEntries = pureVariableSpending.filter((s) => { const d = s.spent_local_date || s.spent_at; return d >= breakdownMonthStart && d <= breakdownMonthEnd; }).length;
+  const breakdownMonthCredits = useMemo(() =>
+    creditSpending.filter((s) => {
+      const d = s.spent_local_date || s.spent_at;
+      return d >= breakdownMonth && d <= breakdownMonthEnd;
+    }).reduce((sum, s) => sum + s.amount, 0),
+  [creditSpending, breakdownMonth, breakdownMonthEnd]);
   const catMax = Math.max(1, ...catBreakdown.map((c) => c.value));
 
   const PAYMENT_ACCOUNT_CATEGORIES = ["checking", "savings", "credit_card"];
@@ -614,70 +621,61 @@ function BudgetPage() {
   }, [accounts]);
 
   // Pace markers — week and month trackers
-  const todayPct = variableDailyLimit ? Math.min(100, (totalVariableToday / variableDailyLimit) * 100) : 0;
-  const todayRemaining = variableDailyLimit - totalVariableToday;
-  const todayOver = todayRemaining < 0;
-  const todayBarColor = !variableDailyLimit ? "bg-muted-foreground" : todayOver ? "bg-destructive" : todayPct >= 80 ? "bg-warning" : "bg-success";
-  const todayTextColor = !variableDailyLimit ? "text-muted-foreground" : todayOver ? "text-destructive" : todayPct >= 80 ? "text-warning" : "text-success";
+  const [yy, mm, dd] = today.split("-").map(Number);
+  const daysInMonth = new Date(yy, mm, 0).getDate();
+  const dayOfMonth = dd;
+  const expectedMonthSpend = variableMonthlyLimit > 0 ? (variableMonthlyLimit / daysInMonth) * dayOfMonth : 0;
+  const expectedMonthPct = variableMonthlyLimit > 0 ? Math.min(100, (expectedMonthSpend / variableMonthlyLimit) * 100) : 0;
+  const monthPaceAhead = totalVariableMonth <= expectedMonthSpend;
+  const monthPaceDiff = Math.abs(expectedMonthSpend - totalVariableMonth);
+  const monthPaceStatus = variableMonthlyLimit === 0 ? "none" : totalVariableMonth > expectedMonthSpend * 1.1 ? "behind" : totalVariableMonth > expectedMonthSpend * 1.0 ? "close" : "ahead";
 
-  const [, , todayDayNum] = today.split("-").map(Number);
-  const [yy2, mm2] = monthStart.split("-").map(Number);
-  const daysInMonth2 = new Date(yy2, mm2, 0).getDate();
-
-  const weekExpected = variableWeeklyLimit > 0 ? (variableWeeklyLimit / 7) * daysElapsedThisWeek : 0;
-  const weekExpectedPct = variableWeeklyLimit > 0 ? Math.min(100, (weekExpected / variableWeeklyLimit) * 100) : 0;
-  const weekActualPct = variableWeeklyLimit > 0 ? Math.min(100, (totalVariableWeek / variableWeeklyLimit) * 100) : 0;
-  const weekPaceGap = weekExpected - totalVariableWeek;
-  const weekAhead = weekPaceGap > 0;
-  const weekOver = totalVariableWeek > variableWeeklyLimit && variableWeeklyLimit > 0;
-
-  const monthExpected = variableMonthlyLimit > 0 ? (variableMonthlyLimit / daysInMonth2) * todayDayNum : 0;
-  const monthExpectedPct = variableMonthlyLimit > 0 ? Math.min(100, (monthExpected / variableMonthlyLimit) * 100) : 0;
-  const monthActualPct = variableMonthlyLimit > 0 ? Math.min(100, (totalVariableMonth / variableMonthlyLimit) * 100) : 0;
-  const monthPaceGap = monthExpected - totalVariableMonth;
-  const monthAhead = monthPaceGap > 0;
-  const monthOver = totalVariableMonth > variableMonthlyLimit && variableMonthlyLimit > 0;
+  const expectedWeekSpendPace = variableWeeklyLimit > 0 ? (variableWeeklyLimit / 7) * daysElapsedThisWeek : 0;
+  const expectedWeekPct = variableWeeklyLimit > 0 ? Math.min(100, (expectedWeekSpendPace / variableWeeklyLimit) * 100) : 0;
+  const weekPaceStatus = variableWeeklyLimit === 0 ? "none" : totalVariableWeek > expectedWeekSpendPace * 1.1 ? "behind" : totalVariableWeek > expectedWeekSpendPace * 1.0 ? "close" : "ahead";
+  const weekPaceDiff = Math.abs(expectedWeekSpendPace - totalVariableWeek);
 
   // Recent spending — filtered + grouped
   const filteredSpending = useMemo(() => {
     const [yy, mm] = monthStart.split("-").map(Number);
-    const prevMonthStartStr = mm === 1 ? `${yy - 1}-12-01` : `${yy}-${String(mm - 1).padStart(2, "0")}-01`;
+    const prevMonthStart = mm === 1 ? `${yy - 1}-12-01` : `${yy}-${String(mm - 1).padStart(2, "0")}-01`;
 
-    return spending.filter((s) => {
-      const d = localDate(s);
-      if (spendTimeFilter === "today" && d !== today) return false;
-      if (spendTimeFilter === "week" && d < weekStart) return false;
-      if (spendTimeFilter === "month" && d < monthStart) return false;
-      if (spendTimeFilter === "lastmonth" && (d < prevMonthStartStr || d >= monthStart)) return false;
+    let entries = [...spending];
 
-      if (spendSearch.trim()) {
-        const q = spendSearch.toLowerCase();
-        const memberName = members.find((m) => m.id === s.member_id)?.name ?? "";
+    if (spendTimeFilter === "today") entries = entries.filter((s) => localDate(s) === today);
+    else if (spendTimeFilter === "week") entries = entries.filter((s) => localDate(s) >= weekStart && localDate(s) <= today);
+    else if (spendTimeFilter === "month") entries = entries.filter((s) => localDate(s) >= monthStart && localDate(s) <= today);
+    else if (spendTimeFilter === "lastmonth") entries = entries.filter((s) => localDate(s) >= prevMonthStart && localDate(s) < monthStart);
+
+    if (spendSearch.trim()) {
+      const q = spendSearch.toLowerCase();
+      entries = entries.filter((s) => {
         const cat = allCategories.find((c) => c.value === s.category)?.label ?? s.category;
-        const matches = [
-          String(s.amount),
-          cat,
-          s.notes ?? "",
-          memberName,
-          s.payment_method ?? "",
-        ].some((v) => v.toLowerCase().includes(q));
-        if (!matches) return false;
-      }
-      return true;
-    });
-  }, [spending, spendTimeFilter, spendSearch, today, weekStart, monthStart, members, allCategories]);
+        const member = members.find((m) => m.id === s.member_id)?.name ?? "";
+        return (
+          String(s.amount).includes(q) ||
+          cat.toLowerCase().includes(q) ||
+          (s.notes ?? "").toLowerCase().includes(q) ||
+          member.toLowerCase().includes(q) ||
+          (s.payment_method ?? "").toLowerCase().includes(q)
+        );
+      });
+    }
 
-  const filteredSummary = useMemo(() => {
-    const entries = filteredSpending.length;
-    const spent = filteredSpending.filter((s) => !isCreditEntry(s)).reduce((sum, s) => sum + s.amount, 0);
-    const returned = filteredSpending.filter((s) => isCreditEntry(s)).reduce((sum, s) => sum + s.amount, 0);
-    const net = spent - returned;
-    return { entries, spent, returned, net };
+    return entries;
+  }, [spending, spendTimeFilter, spendSearch, today, weekStart, monthStart, allCategories, members]);
+
+  const spendingSummary = useMemo(() => {
+    const variable = filteredSpending.filter((s) => !isFixedEntry(s) && !isCreditEntry(s));
+    const credits = filteredSpending.filter((s) => isCreditEntry(s));
+    const spent = variable.reduce((s, x) => s + x.amount, 0);
+    const returned = credits.reduce((s, x) => s + x.amount, 0);
+    return { count: filteredSpending.length, spent, returned, net: spent - returned };
   }, [filteredSpending]);
 
   const groupedSpending = useMemo(() => {
     const groups = new Map<string, typeof spending>();
-    for (const s of filteredSpending.slice(0, 100)) {
+    for (const s of filteredSpending) {
       const d = localDate(s);
       if (!groups.has(d)) groups.set(d, []);
       groups.get(d)!.push(s);
@@ -685,13 +683,13 @@ function BudgetPage() {
     return Array.from(groups.entries()).sort((a, b) => b[0].localeCompare(a[0]));
   }, [filteredSpending]);
 
-  const formatDateHeader = (iso: string) => {
-    if (iso === today) return `Today — ${new Date(iso + "T12:00:00").toLocaleDateString("default", { month: "short", day: "numeric" })}`;
+  const formatDateLabel = (iso: string) => {
+    if (iso === today) return "Today";
     const yesterday = new Date(today + "T12:00:00");
     yesterday.setDate(yesterday.getDate() - 1);
-    const yestIso = yesterday.toISOString().slice(0, 10);
-    if (iso === yestIso) return `Yesterday — ${new Date(iso + "T12:00:00").toLocaleDateString("default", { month: "short", day: "numeric" })}`;
-    return new Date(iso + "T12:00:00").toLocaleDateString("default", { month: "short", day: "numeric", weekday: "short" });
+    const yest = yesterday.toISOString().slice(0, 10);
+    if (iso === yest) return "Yesterday";
+    return new Date(iso + "T12:00:00").toLocaleDateString("default", { month: "short", day: "numeric" });
   };
 
   return (
