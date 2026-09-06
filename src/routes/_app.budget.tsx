@@ -620,31 +620,23 @@ function BudgetPage() {
   const todayBarColor = !variableDailyLimit ? "bg-muted-foreground" : todayOver ? "bg-destructive" : todayPct >= 80 ? "bg-warning" : "bg-success";
   const todayTextColor = !variableDailyLimit ? "text-muted-foreground" : todayOver ? "text-destructive" : todayPct >= 80 ? "text-warning" : "text-success";
 
-  const weekDaysElapsed = daysElapsedThisWeek;
-  const weekDaysTotal = 7;
-  const weekExpected = variableWeeklyLimit > 0 ? (variableWeeklyLimit / weekDaysTotal) * weekDaysElapsed : 0;
-  const weekExpectedPct = variableWeeklyLimit > 0 ? Math.min(100, (weekExpected / variableWeeklyLimit) * 100) : 0;
-  const weekActualPct = variableWeeklyLimit > 0 ? Math.min(100, (totalVariableWeek / variableWeeklyLimit) * 100) : 0;
-  const weekRemaining = variableWeeklyLimit - totalVariableWeek;
-  const weekOver = weekRemaining < 0;
-  const weekPaceGap = weekExpected - totalVariableWeek;
-  const weekAhead = weekPaceGap > 0;
-  const weekPaceClose = !weekOver && !weekAhead && Math.abs(weekPaceGap) / Math.max(1, variableWeeklyLimit) < 0.1;
-  const weekBarColor = weekOver ? "bg-destructive" : weekActualPct >= 80 ? "bg-warning" : "bg-success";
-  const weekTextColor = weekOver ? "text-destructive" : weekAhead ? "text-success" : weekPaceClose ? "text-warning" : "text-success";
-
   const [, , todayDayNum] = today.split("-").map(Number);
   const [yy2, mm2] = monthStart.split("-").map(Number);
   const daysInMonth2 = new Date(yy2, mm2, 0).getDate();
+
+  const weekExpected = variableWeeklyLimit > 0 ? (variableWeeklyLimit / 7) * daysElapsedThisWeek : 0;
+  const weekExpectedPct = variableWeeklyLimit > 0 ? Math.min(100, (weekExpected / variableWeeklyLimit) * 100) : 0;
+  const weekActualPct = variableWeeklyLimit > 0 ? Math.min(100, (totalVariableWeek / variableWeeklyLimit) * 100) : 0;
+  const weekPaceGap = weekExpected - totalVariableWeek;
+  const weekAhead = weekPaceGap > 0;
+  const weekOver = totalVariableWeek > variableWeeklyLimit && variableWeeklyLimit > 0;
+
   const monthExpected = variableMonthlyLimit > 0 ? (variableMonthlyLimit / daysInMonth2) * todayDayNum : 0;
   const monthExpectedPct = variableMonthlyLimit > 0 ? Math.min(100, (monthExpected / variableMonthlyLimit) * 100) : 0;
   const monthActualPct = variableMonthlyLimit > 0 ? Math.min(100, (totalVariableMonth / variableMonthlyLimit) * 100) : 0;
-  const monthRemaining = variableMonthlyLimit - totalVariableMonth;
-  const monthOver = monthRemaining < 0;
   const monthPaceGap = monthExpected - totalVariableMonth;
   const monthAhead = monthPaceGap > 0;
-  const monthBarColor = monthOver ? "bg-destructive" : monthActualPct >= 80 ? "bg-warning" : "bg-success";
-  const monthTextColor = monthOver ? "text-destructive" : monthAhead ? "text-success" : "text-warning";
+  const monthOver = totalVariableMonth > variableMonthlyLimit && variableMonthlyLimit > 0;
 
   // Recent spending — filtered + grouped
   const filteredSpending = useMemo(() => {
@@ -1009,17 +1001,26 @@ function BudgetPage() {
                       <span className="text-xs text-muted-foreground">{fmtMoney(totalVariableWeek)} of {variableWeeklyLimit ? fmtMoney(variableWeeklyLimit) : "—"}</span>
                     </div>
                     <div className="relative h-2.5 overflow-visible rounded-full bg-muted">
-                      <div className={`h-full rounded-full transition-all ${weekBarColor}`} style={{ width: `${weekActualPct}%` }} />
+                      <div
+                        className={`h-full rounded-full transition-all ${weekOver ? "bg-destructive" : weekActualPct >= 80 ? "bg-warning" : "bg-success"}`}
+                        style={{ width: `${weekActualPct}%` }}
+                      />
                       {variableWeeklyLimit > 0 && (
-                        <div className="absolute top-[-4px] w-[2.5px] h-[18px] rounded-sm bg-foreground/40 z-10" style={{ left: `${weekExpectedPct}%` }} />
+                        <div
+                          className="absolute top-[-4px] w-[2.5px] h-[18px] rounded-sm bg-foreground/40 z-10 pointer-events-none"
+                          style={{ left: `clamp(0%, ${weekExpectedPct}%, calc(100% - 2.5px))` }}
+                        />
                       )}
                     </div>
                     <div className="mt-1 flex items-center justify-between">
-                      <span className={`text-xs font-medium ${weekTextColor}`}>
-                        {!variableWeeklyLimit ? "No limit set" : weekOver ? `Over by ${fmtMoney(Math.abs(weekRemaining))}` : weekAhead ? `${fmtMoney(weekPaceGap)} ahead of pace` : `${fmtMoney(Math.abs(weekPaceGap))} behind pace`}
+                      <span className={`text-xs font-medium ${weekOver ? "text-destructive" : weekAhead ? "text-success" : "text-warning"}`}>
+                        {!variableWeeklyLimit ? "No limit set"
+                          : weekOver ? `Over by ${fmtMoney(Math.abs(variableWeeklyLimit - totalVariableWeek))}`
+                          : weekAhead ? `${fmtMoney(weekPaceGap)} ahead of pace`
+                          : `${fmtMoney(Math.abs(weekPaceGap))} behind pace`}
                       </span>
                       {variableWeeklyLimit > 0 && (
-                        <span className="text-xs text-muted-foreground">expected {fmtMoney(weekExpected)} · day {weekDaysElapsed} of {weekDaysTotal}</span>
+                        <span className="text-xs text-muted-foreground">expected {fmtMoney(weekExpected)} · day {daysElapsedThisWeek} of 7</span>
                       )}
                     </div>
                   </div>
@@ -1029,30 +1030,29 @@ function BudgetPage() {
                       <span className="text-xs text-muted-foreground">{fmtMoney(totalVariableMonth)} of {variableMonthlyLimit ? fmtMoney(variableMonthlyLimit) : "—"}</span>
                     </div>
                     <div className="relative h-2.5 overflow-visible rounded-full bg-muted">
-                      <div className={`h-full rounded-full transition-all ${monthBarColor}`} style={{ width: `${monthActualPct}%` }} />
+                      <div
+                        className={`h-full rounded-full transition-all ${monthOver ? "bg-destructive" : monthActualPct >= 80 ? "bg-warning" : "bg-success"}`}
+                        style={{ width: `${monthActualPct}%` }}
+                      />
                       {variableMonthlyLimit > 0 && (
-                        <div className="absolute top-[-4px] w-[2.5px] h-[18px] rounded-sm bg-foreground/40 z-10" style={{ left: `${monthExpectedPct}%` }} />
+                        <div
+                          className="absolute top-[-4px] w-[2.5px] h-[18px] rounded-sm bg-foreground/40 z-10 pointer-events-none"
+                          style={{ left: `clamp(0%, ${monthExpectedPct}%, calc(100% - 2.5px))` }}
+                        />
                       )}
                     </div>
                     <div className="mt-1 flex items-center justify-between">
-                      <span className={`text-xs font-medium ${monthTextColor}`}>
-                        {!variableMonthlyLimit ? "No limit set" : monthOver ? `Over by ${fmtMoney(Math.abs(monthRemaining))}` : monthAhead ? `${fmtMoney(monthPaceGap)} ahead of pace` : `${fmtMoney(Math.abs(monthPaceGap))} behind pace`}
+                      <span className={`text-xs font-medium ${monthOver ? "text-destructive" : monthAhead ? "text-success" : "text-warning"}`}>
+                        {!variableMonthlyLimit ? "No limit set"
+                          : monthOver ? `Over by ${fmtMoney(Math.abs(variableMonthlyLimit - totalVariableMonth))}`
+                          : monthAhead ? `${fmtMoney(monthPaceGap)} ahead of pace`
+                          : `${fmtMoney(Math.abs(monthPaceGap))} behind pace`}
                       </span>
                       {variableMonthlyLimit > 0 && (
                         <span className="text-xs text-muted-foreground">expected {fmtMoney(monthExpected)} · day {todayDayNum} of {daysInMonth2}</span>
                       )}
                     </div>
                   </div>
-                  {(variableWeeklyLimit > 0 || variableMonthlyLimit > 0) && (
-                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border flex-wrap">
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <div className="w-4 h-1.5 rounded-full bg-success" />Actual spend
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <div className="w-0.5 h-3.5 rounded-sm bg-foreground/40" />Where you should be
-                      </div>
-                    </div>
-                  )}
                 </div>
                 {(totalCreditsToday > 0 || totalCreditsWeek > 0 || totalCreditsMonth > 0) && (
                   <div className="border-t border-border pt-3 mt-4">
@@ -1063,6 +1063,16 @@ function BudgetPage() {
                     <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
                       {totalCreditsToday > 0 && <span>Today: +{fmtMoney(totalCreditsToday)}</span>}
                       {totalCreditsWeek > 0 && <span>This week: +{fmtMoney(totalCreditsWeek)}</span>}
+                    </div>
+                  </div>
+                )}
+                {(variableWeeklyLimit > 0 || variableMonthlyLimit > 0) && (
+                  <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border flex-wrap">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <div className="w-4 h-1.5 rounded-full bg-success" />Actual spend
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <div className="w-0.5 h-3.5 rounded-sm bg-foreground/40" />Where you should be
                     </div>
                   </div>
                 )}
