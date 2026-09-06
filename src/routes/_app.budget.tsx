@@ -1016,20 +1016,20 @@ function BudgetPage() {
                         </div>
                         <div className="h-2.5 overflow-visible rounded-full bg-muted relative">
                           <div className={`h-full transition-all rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
-                          {showPace && limit > 0 && expectedPct !== undefined && (
+                          {showPace && limit > 0 && (
                             <div
                               className="absolute top-[-4px] w-[2.5px] h-[18px] rounded-sm bg-foreground/40 z-10"
                               style={{ left: `${expectedPct}%` }}
                             />
                           )}
                         </div>
-                        <div className="mt-1 flex items-center justify-between">
+                        <div className="mt-1 flex items-center justify-between gap-2">
                           <div className={`text-xs font-medium ${textColor}`}>
                             {!limit ? "No limit set" : over ? `Over by ${fmtMoney(Math.abs(remaining))}` :
-                              showPace && paceStatus && paceStatus !== "none" ? (
-                                paceStatus === "behind" ? `${fmtMoney(paceDiff!)} behind pace` :
-                                paceStatus === "close" ? `On pace — ${fmtMoney(remaining)} left` :
-                                `${fmtMoney(paceDiff!)} ahead of pace`
+                              showPace && paceStatus !== "none" ? (
+                                paceStatus === "behind" ? `${fmtMoney(paceDiff)} behind pace` :
+                                paceStatus === "close" ? `On pace · ${fmtMoney(remaining)} left` :
+                                `${fmtMoney(paceDiff)} ahead of pace`
                               ) : `${fmtMoney(remaining)} left`
                             }
                           </div>
