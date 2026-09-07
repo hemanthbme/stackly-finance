@@ -1,10 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RequireHousehold } from "@/components/RequireHousehold";
 import { useAccounts, useSnapshots } from "@/lib/data-hooks";
-import { CATEGORY_LABELS, fmtMoney, isAsset, isLiability, type AccountCategory } from "@/lib/finance";
+import { CATEGORY_LABELS, CASH_CATEGORIES, INVESTMENT_CATEGORIES, RETIREMENT_CATEGORIES, fmtMoney, isAsset, isLiability, type AccountCategory } from "@/lib/finance";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
+import { ResponsiveContainer, LineChart, Line, AreaChart, Area, BarChart, Bar, ComposedChart, ReferenceLine, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
+import { useHousehold } from "@/lib/household-context";
+import { useProfile } from "@/lib/profile-context";
+import { supabase } from "@/integrations/supabase/client";
+import { todayInTz } from "@/lib/tz";
 
 export const Route = createFileRoute("/_app/analytics")({
   component: () => (<RequireHousehold><AnalyticsPage /></RequireHousehold>),
@@ -50,6 +54,113 @@ function AnalyticsPage() {
       return point;
     });
   }, [weeks, accounts, snapshots, accountId, categoryFilter]);
+
+  // Assets vs Liabilities series — both lines on same chart
+  const assetsVsLiabsSeries = useMemo(() => {
+    return weeks.map((w) => {
+      let assets = 0, liabs = 0;
+      for (const a of accounts) {
+        if (!a.include_in_net_worth) continue;
+        const upTo = snapshots.filter((s) => s.account_id === a.id && s.week_ending <= w);
+        const last = upTo[upTo.length - 1];
+        if (!last) continue;
+        if (isAsset(a.category)) assets += last.balance;
+        if (isLiability(a.category)) liabs += Math.abs(last.balance);
+      }
+      return { week: w.slice(5), assets, liabilities: liabs };
+    });
+  }, [weeks, accounts, snapshots]);
+
+  // Debt only series
+  const debtSeries = useMemo(() => {
+    return weeks.map((w) => {
+      let debt = 0;
+      for (const a of accounts) {
+        if (!isLiability(a.category as any) || !a.include_in_net_worth) continue;
+        const upTo = snapshots.filter((s) => s.account_id === a.id && s.week_ending <= w);
+        const last = upTo[upTo.length - 1];
+        if (!last) continue;
+        debt += Math.abs(last.balance);
+      }
+      return { week: w.slice(5), debt };
+    });
+  }, [weeks, accounts, snapshots]);
+
+  // Retirement series
+  const retireSeries = useMemo(() => {
+    return weeks.map((w) => {
+      let retire = 0;
+      for (const a of accounts) {
+        if (!RETIREMENT_CATEGORIES.includes(a.category as any)) continue;
+        const upTo = snapshots.filter((s) => s.account_id === a.id && s.week_ending <= w);
+        const last = upTo[upTo.length - 1];
+        if (!last) continue;
+        retire += last.balance;
+      }
+      return { week: w.slice(5), retirement: retire };
+    });
+  }, [weeks, accounts, snapshots]);
+
+  // Investment series (brokerage only)
+  const investSeries = useMemo(() => {
+    return weeks.map((w) => {
+      let invest = 0;
+      for (const a of accounts) {
+        if (!INVESTMENT_CATEGORIES.includes(a.category as any)) continue;
+        const upTo = snapshots.filter((s) => s.account_id === a.id && s.week_ending <= w);
+        const last = upTo[upTo.length - 1];
+        if (!last) continue;
+        invest += last.balance;
+      }
+      return { week: w.slice(5), investments: invest };
+    });
+  }, [weeks, accounts, snapshots]);
+
+  const { active } = useHousehold();
+  const { profile } = useProfile();
+  const tz = profile?.user_timezone || "UTC";
+  const today = todayInTz(tz);
+  const [spendingByMonth, setSpendingByMonth] = useState<{ month: string; spent: number; budget: number; returned: number }[]>([]);
+
+  useEffect(() => {
+    if (!active) return;
+    (async () => {
+      const [entriesRes, budgetRes] = await Promise.all([
+        supabase.from("spending_entries").select("amount,spent_at,spent_local_date,notes").eq("household_id", active.id),
+        supabase.from("budgets").select("daily_limit,budget_type,period,is_active").eq("household_id", active.id),
+      ]);
+      const b = (budgetRes.data ?? []).find((x: any) => x.budget_type === "combined" && x.period === "daily" && x.is_active);
+      const dailyLimit = b ? Number(b.daily_limit) : 0;
+      const entries = entriesRes.data ?? [];
+
+      const monthMap = new Map<string, { spent: number; returned: number; days: number }>();
+      for (const e of entries) {
+        const d = (e as any).spent_local_date || (e as any).spent_at;
+        const mon = String(d).slice(0, 7);
+        const notes = (e as any).notes ?? "";
+        const isCredit = notes.startsWith("[CREDIT]");
+        const isFixed = notes.startsWith("[FIXED]");
+        if (!monthMap.has(mon)) {
+          const daysInMon = new Date(Number(mon.slice(0, 4)), Number(mon.slice(5, 7)), 0).getDate();
+          monthMap.set(mon, { spent: 0, returned: 0, days: daysInMon });
+        }
+        const entry = monthMap.get(mon)!;
+        if (isCredit) entry.returned += Number((e as any).amount);
+        else if (!isFixed) entry.spent += Number((e as any).amount);
+      }
+
+      const result = Array.from(monthMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .slice(-12)
+        .map(([month, { spent, returned, days }]) => ({
+          month: new Date(month + "-15").toLocaleString("default", { month: "short", year: "2-digit" }),
+          spent: Math.round(spent),
+          returned: Math.round(returned),
+          budget: dailyLimit * days,
+        }));
+      setSpendingByMonth(result);
+    })();
+  }, [active?.id]);
 
   const chartLines: { key: string; name: string; color: string }[] =
     view === "net" ? [{ key: "net", name: "Net Worth", color: "oklch(0.62 0.22 277)" }]
