@@ -220,8 +220,133 @@ function AnalyticsPage() {
               {r}
             </button>
           ))}
+      </div>
+
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
+          <div className="flex items-baseline justify-between mb-4">
+            <h3 className="font-display text-lg font-semibold">Assets vs Liabilities</h3>
+            <div className="text-sm text-muted-foreground">
+              Latest assets: <span className="font-semibold text-success">{fmtMoney(assetsVsLiabsSeries[assetsVsLiabsSeries.length - 1]?.assets ?? 0)}</span>
+              {" · "}Liabilities: <span className="font-semibold text-warning">{fmtMoney(assetsVsLiabsSeries[assetsVsLiabsSeries.length - 1]?.liabilities ?? 0)}</span>
+            </div>
+          </div>
+          {assetsVsLiabsSeries.length === 0 ? (
+            <div className="grid h-72 place-items-center text-sm text-muted-foreground">No data yet.</div>
+          ) : (
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={assetsVsLiabsSeries}>
+                  <defs>
+                    <linearGradient id="assetGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="oklch(0.74 0.17 160)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="oklch(0.74 0.17 160)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="oklch(0.28 0.05 280)" strokeDasharray="3 3" />
+                  <XAxis dataKey="week" stroke="oklch(0.7 0.04 270)" fontSize={12} />
+                  <YAxis stroke="oklch(0.7 0.04 270)" fontSize={12} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip contentStyle={{ background: "oklch(0.18 0.05 280)", border: "1px solid oklch(0.28 0.05 280)", borderRadius: 8 }} formatter={(v: number) => fmtMoney(v)} />
+                  <Legend />
+                  <Line type="monotone" dataKey="assets" name="Assets" stroke="oklch(0.74 0.17 160)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="liabilities" name="Liabilities" stroke="oklch(0.65 0.24 20)" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
+          <div className="flex items-baseline justify-between mb-4">
+            <h3 className="font-display text-lg font-semibold">Debt over time</h3>
+            <div className="text-sm text-muted-foreground">
+              Current: <span className="font-semibold text-warning">{fmtMoney(debtSeries[debtSeries.length - 1]?.debt ?? 0)}</span>
+              {debtSeries.length >= 2 && (
+                <span className={`ml-2 ${(debtSeries[debtSeries.length - 1]?.debt ?? 0) < (debtSeries[debtSeries.length - 2]?.debt ?? 0) ? "text-success" : "text-destructive"}`}>
+                  {(debtSeries[debtSeries.length - 1]?.debt ?? 0) < (debtSeries[debtSeries.length - 2]?.debt ?? 0) ? "↓ decreasing" : "↑ increasing"}
+                </span>
+              )}
+            </div>
+          </div>
+          {debtSeries.length === 0 ? (
+            <div className="grid h-72 place-items-center text-sm text-muted-foreground">No debt accounts tracked.</div>
+          ) : (
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={debtSeries}>
+                  <defs>
+                    <linearGradient id="debtGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="oklch(0.65 0.24 20)" stopOpacity={0.5} />
+                      <stop offset="95%" stopColor="oklch(0.65 0.24 20)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="oklch(0.28 0.05 280)" strokeDasharray="3 3" />
+                  <XAxis dataKey="week" stroke="oklch(0.7 0.04 270)" fontSize={12} />
+                  <YAxis stroke="oklch(0.7 0.04 270)" fontSize={12} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip contentStyle={{ background: "oklch(0.18 0.05 280)", border: "1px solid oklch(0.28 0.05 280)", borderRadius: 8 }} formatter={(v: number) => fmtMoney(v)} />
+                  <Area type="monotone" dataKey="debt" name="Total Debt" stroke="oklch(0.65 0.24 20)" strokeWidth={2} fill="url(#debtGrad)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
+          <div className="flex items-baseline justify-between mb-4">
+            <h3 className="font-display text-lg font-semibold">Retirement & Investments</h3>
+            <div className="text-sm text-muted-foreground">
+              Retirement: <span className="font-semibold text-primary">{fmtMoney(retireSeries[retireSeries.length - 1]?.retirement ?? 0)}</span>
+              {" · "}Investments: <span className="font-semibold" style={{ color: "oklch(0.82 0.16 80)" }}>{fmtMoney(investSeries[investSeries.length - 1]?.investments ?? 0)}</span>
+            </div>
+          </div>
+          {retireSeries.length === 0 && investSeries.length === 0 ? (
+            <div className="grid h-72 place-items-center text-sm text-muted-foreground">No retirement or investment accounts tracked.</div>
+          ) : (
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={weeks.map((w, i) => ({ week: w.slice(5), retirement: retireSeries[i]?.retirement ?? 0, investments: investSeries[i]?.investments ?? 0 }))}>
+                  <CartesianGrid stroke="oklch(0.28 0.05 280)" strokeDasharray="3 3" />
+                  <XAxis dataKey="week" stroke="oklch(0.7 0.04 270)" fontSize={12} />
+                  <YAxis stroke="oklch(0.7 0.04 270)" fontSize={12} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip contentStyle={{ background: "oklch(0.18 0.05 280)", border: "1px solid oklch(0.28 0.05 280)", borderRadius: 8 }} formatter={(v: number) => fmtMoney(v)} />
+                  <Legend />
+                  <Line type="monotone" dataKey="retirement" name="Retirement" stroke="oklch(0.62 0.22 277)" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="investments" name="Investments" stroke="oklch(0.82 0.16 80)" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
+          <div className="flex items-baseline justify-between mb-4">
+            <h3 className="font-display text-lg font-semibold">Monthly spending vs budget</h3>
+            <div className="text-sm text-muted-foreground">Last 12 months · variable only</div>
+          </div>
+          {spendingByMonth.length === 0 ? (
+            <div className="grid h-72 place-items-center text-sm text-muted-foreground">No spending data yet.</div>
+          ) : (
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={spendingByMonth}>
+                  <CartesianGrid stroke="oklch(0.28 0.05 280)" strokeDasharray="3 3" />
+                  <XAxis dataKey="month" stroke="oklch(0.7 0.04 270)" fontSize={12} />
+                  <YAxis stroke="oklch(0.7 0.04 270)" fontSize={12} tickFormatter={(v) => `$${(v / 1000).toFixed(1)}k`} />
+                  <Tooltip
+                    contentStyle={{ background: "oklch(0.18 0.05 280)", border: "1px solid oklch(0.28 0.05 280)", borderRadius: 8 }}
+                    formatter={(v: number, name: string) => [fmtMoney(v), name]}
+                  />
+                  <Legend />
+                  <Bar dataKey="spent" name="Spent" fill="oklch(0.62 0.22 277)" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                  <Bar dataKey="returned" name="Returned" fill="oklch(0.74 0.17 160)" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                  <Line type="monotone" dataKey="budget" name="Budget limit" stroke="oklch(0.65 0.24 20)" strokeWidth={2} strokeDasharray="6 3" dot={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
       </div>
+    </div>
 
       <div className="rounded-2xl border border-border bg-card p-5 shadow-card">
         <div className="flex items-baseline justify-between">
