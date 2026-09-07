@@ -431,10 +431,27 @@ function DailyBudgetSummary() {
   const totalCreditsMonth = creditEntries.filter((e) => dateOf(e) >= monthStart && dateOf(e) <= today).reduce((s, e) => s + e.amount, 0);
   const creditsCountMonth = creditEntries.filter((e) => dateOf(e) >= monthStart && dateOf(e) <= today).length;
 
+  const todayD2 = new Date(today + "T12:00:00");
+  const dayOfMonth = todayD2.getDate();
+  const daysInMonth = new Date(todayD2.getFullYear(), todayD2.getMonth() + 1, 0).getDate();
+  const wkStartD2 = new Date(today + "T12:00:00");
+  wkStartD2.setDate(wkStartD2.getDate() - wkStartD2.getDay());
+  const daysElapsedThisWeek = Math.max(1, Math.round((todayD2.getTime() - wkStartD2.getTime()) / 86400000) + 1);
+
+  const expectedWeekSpend = variableWeeklyLimit > 0 ? (variableWeeklyLimit / 7) * daysElapsedThisWeek : 0;
+  const expectedWeekPct = variableWeeklyLimit > 0 ? Math.min(100, (expectedWeekSpend / variableWeeklyLimit) * 100) : 0;
+  const weekPaceDiff = Math.abs(expectedWeekSpend - totalVariableWeek);
+  const weekPaceStatus = variableWeeklyLimit === 0 ? "none" : totalVariableWeek > expectedWeekSpend * 1.1 ? "behind" : totalVariableWeek > expectedWeekSpend ? "close" : "ahead";
+
+  const expectedMonthSpend = variableMonthlyLimit > 0 ? (variableMonthlyLimit / daysInMonth) * dayOfMonth : 0;
+  const expectedMonthPct = variableMonthlyLimit > 0 ? Math.min(100, (expectedMonthSpend / variableMonthlyLimit) * 100) : 0;
+  const monthPaceDiff = Math.abs(expectedMonthSpend - totalVariableMonth);
+  const monthPaceStatus = variableMonthlyLimit === 0 ? "none" : totalVariableMonth > expectedMonthSpend * 1.1 ? "behind" : totalVariableMonth > expectedMonthSpend ? "close" : "ahead";
+
   const rows = [
-    { label: "Today", spent: totalVariableToday, limit: variableDailyLimit },
-    { label: "This week", spent: totalVariableWeek, limit: variableWeeklyLimit },
-    { label: "This month", spent: totalVariableMonth, limit: variableMonthlyLimit },
+    { label: "Today", spent: totalVariableToday, limit: variableDailyLimit, showPace: false, expectedPct: 0, paceStatus: "none" as const, paceDiff: 0, paceLabel: "" },
+    { label: "This week", spent: totalVariableWeek, limit: variableWeeklyLimit, showPace: true, expectedPct: expectedWeekPct, paceStatus: weekPaceStatus as "ahead"|"close"|"behind"|"none", paceDiff: weekPaceDiff, paceLabel: `expected ${fmtMoney(expectedWeekSpend)} · day ${daysElapsedThisWeek} of 7` },
+    { label: "This month", spent: totalVariableMonth, limit: variableMonthlyLimit, showPace: true, expectedPct: expectedMonthPct, paceStatus: monthPaceStatus as "ahead"|"close"|"behind"|"none", paceDiff: monthPaceDiff, paceLabel: `expected ${fmtMoney(expectedMonthSpend)} · day ${dayOfMonth} of ${daysInMonth}` },
   ];
 
   return (
@@ -457,7 +474,7 @@ function DailyBudgetSummary() {
       ) : (
         <>
           <div className="mt-4 space-y-3">
-            {rows.map(({ label, spent, limit: lim }) => {
+            {rows.map(({ label, spent, limit: lim, showPace, expectedPct, paceStatus, paceDiff, paceLabel }) => {
               const pct = lim ? Math.min(100, (spent / lim) * 100) : 0;
               const remaining = lim - spent;
               const over = remaining < 0;
@@ -470,11 +487,25 @@ function DailyBudgetSummary() {
                     <span className="text-xs font-medium">{label}</span>
                     <span className="text-xs text-muted-foreground">{fmtMoney(spent)} of {fmtMoney(lim)}</span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
-                    <div className={`h-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                  <div className="h-2 overflow-visible rounded-full bg-muted relative">
+                    <div className={`h-full transition-all rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                    {showPace && lim > 0 && (
+                      <div className="absolute top-[-3px] w-[2px] h-[16px] rounded-sm bg-foreground/40 z-10" style={{ left: `${expectedPct}%` }} />
+                    )}
                   </div>
-                  <div className={`mt-0.5 text-[11px] font-medium ${textColor}`}>
-                    {over ? `Over by ${fmtMoney(Math.abs(remaining))}` : `${fmtMoney(remaining)} left`}
+                  <div className="mt-0.5 flex items-center justify-between gap-2">
+                    <div className={`text-[11px] font-medium ${textColor}`}>
+                      {over ? `Over by ${fmtMoney(Math.abs(remaining))}` :
+                        showPace && paceStatus !== "none" ? (
+                          paceStatus === "behind" ? `${fmtMoney(paceDiff)} behind pace` :
+                          paceStatus === "close" ? `On pace · ${fmtMoney(remaining)} left` :
+                          `${fmtMoney(paceDiff)} ahead of pace`
+                        ) : `${fmtMoney(remaining)} left`
+                      }
+                    </div>
+                    {showPace && lim > 0 && paceLabel && (
+                      <div className="text-[10px] text-muted-foreground">{paceLabel}</div>
+                    )}
                   </div>
                 </div>
               );
