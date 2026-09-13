@@ -43,7 +43,10 @@ function Login() {
           <div className="space-y-2"><Label htmlFor="email">Email</Label>
             <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>
           <div className="space-y-2"><Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+            <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+            <div className="text-right">
+              <Link to="/forgot-password" className="text-xs text-muted-foreground hover:underline">Forgot password?</Link>
+            </div></div>
           <Button type="submit" disabled={busy} className="w-full bg-gradient-primary shadow-glow">{busy ? "Logging in…" : "Log in"}</Button>
         </form>
         <p className="mt-6 text-center text-sm text-muted-foreground">
