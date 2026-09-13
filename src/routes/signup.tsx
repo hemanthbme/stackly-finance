@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { GoogleSignInButton, AuthDivider } from "@/components/GoogleSignInButton";
 
 export const Route = createFileRoute("/signup")({
   component: Signup,
@@ -44,7 +45,9 @@ function Signup() {
         </Link>
         <h1 className="font-display text-2xl font-bold">Start stacking</h1>
         <p className="mt-1 text-sm text-muted-foreground">Free. Takes 30 seconds.</p>
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
+        <div className="mt-6"><GoogleSignInButton label="Sign up with Google" /></div>
+        <AuthDivider />
+        <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-2"><Label htmlFor="name">Your name</Label>
             <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} /></div>
           <div className="space-y-2"><Label htmlFor="email">Email</Label>

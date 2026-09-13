@@ -43,10 +43,17 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         await supabase.from("profiles").update({ user_timezone: detected }).eq("id", user.id);
         p.user_timezone = detected;
       }
+      const meta = (user.user_metadata ?? {}) as Record<string, any>;
+      const fallbackName =
+        p.display_name ||
+        meta.display_name ||
+        meta.full_name ||
+        meta.name ||
+        (user.email ? user.email.split("@")[0] : null);
       setProfile({
         id: p.id,
-        display_name: p.display_name,
-        avatar_url: p.avatar_url,
+        display_name: fallbackName ?? null,
+        avatar_url: p.avatar_url || meta.avatar_url || meta.picture || null,
         user_timezone: p.user_timezone || browserTz(),
         currency: p.currency || "USD",
         date_format: p.date_format || "MM/DD/YYYY",
