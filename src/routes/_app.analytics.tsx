@@ -9,6 +9,7 @@ import { useHousehold } from "@/lib/household-context";
 import { useProfile } from "@/lib/profile-context";
 import { supabase } from "@/integrations/supabase/client";
 import { todayInTz } from "@/lib/tz";
+import { NetWorthProjection } from "@/components/NetWorthProjection";
 
 export const Route = createFileRoute("/_app/analytics")({
   component: () => (<RequireHousehold><AnalyticsPage /></RequireHousehold>),
@@ -373,6 +374,8 @@ function AnalyticsPage() {
           </div>
         )}
       </div>
+
+      <NetWorthProjection accounts={accounts} snapshots={snapshots} />
     </div>
   );
 }
