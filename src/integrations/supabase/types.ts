@@ -714,6 +714,7 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       is_household_member: { Args: { _household_id: string }; Returns: boolean }
       is_household_owner: { Args: { _household_id: string }; Returns: boolean }
+      seed_demo_household: { Args: never; Returns: string }
     }
     Enums: {
       account_category:
