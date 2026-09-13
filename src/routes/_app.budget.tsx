@@ -458,25 +458,28 @@ function BudgetPage() {
       ? `${yy - 1}-12-01`
       : `${yy}-${String(mm - 1).padStart(2, "0")}-01`;
     const prevMonthEnd = `${yy}-${String(mm).padStart(2, "0")}-01`;
-    return spending
-      .filter((s) => {
-        const d = s.spent_local_date || s.spent_at;
-        return d >= prevMonthStart && d < prevMonthEnd;
-      })
-      .reduce((sum, s) => sum + s.amount, 0);
+    const inPrev = (s: Spending) => {
+      const d = localDate(s);
+      return d >= prevMonthStart && d < prevMonthEnd;
+    };
+    const pure = pureVariableSpending.filter(inPrev).reduce((sum, s) => sum + s.amount, 0);
+    const cred = creditSpending.filter(inPrev).reduce((sum, s) => sum + s.amount, 0);
+    return Math.max(0, pure - cred);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spending, monthStart]);
 
-  // Projection chart data (full month)
+  // Projection chart data (full month) — actual line uses the same basis as the
+  // stat tiles: pure variable spending ([FIXED] excluded, [CREDIT] subtracted).
   const projectionChart = useMemo(() => {
     const [yy, mm] = monthStart.split("-").map(Number);
     const daysInMonth = new Date(yy, mm, 0).getDate();
-    // cumulative actual per day
     const days: { day: number; date: string; actual: number | null; projected: number | null; budget: number | null }[] = [];
     let runTotal = 0;
     const [, , td] = today.split("-").map(Number);
     for (let i = 1; i <= daysInMonth; i++) {
       const iso = `${yy}-${String(mm).padStart(2, "0")}-${String(i).padStart(2, "0")}`;
-      const dayTotal = spending.filter((s) => localDate(s) === iso).reduce((s, x) => s + x.amount, 0);
+      const onDay = (arr: typeof spending) => arr.filter((s) => localDate(s) === iso).reduce((s, x) => s + x.amount, 0);
+      const dayTotal = onDay(pureVariableSpending) - onDay(creditSpending);
       runTotal += dayTotal;
       const isPast = i <= td;
       days.push({
@@ -1617,19 +1620,19 @@ function ProjectionChart({ days, max, monthlyLimit }: { days: { day: number; act
     <div className="mt-5 overflow-x-auto">
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ minWidth: 320 }}>
         {/* budget line */}
-        <line x1={P} x2={W - P} y1={budgetY} y2={budgetY} stroke="hsl(var(--warning))" strokeDasharray="4 4" />
-        <text x={W - P} y={budgetY - 4} textAnchor="end" fontSize="10" fill="hsl(var(--warning))">Budget {fmtMoney(monthlyLimit)}</text>
+        <line x1={P} x2={W - P} y1={budgetY} y2={budgetY} stroke="var(--warning)" strokeDasharray="4 4" />
+        <text x={W - P} y={budgetY - 4} textAnchor="end" fontSize="10" fill="var(--warning)">Budget {fmtMoney(monthlyLimit)}</text>
 
         {/* projected */}
-        <path d={projPath} fill="none" stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" strokeWidth="1.5" />
+        <path d={projPath} fill="none" stroke="var(--muted-foreground)" strokeDasharray="3 3" strokeWidth="1.5" />
         {/* actual */}
-        <path d={actualPath} fill="none" stroke="hsl(var(--primary))" strokeWidth="2.5" />
+        <path d={actualPath} fill="none" stroke="var(--primary)" strokeWidth="2.5" />
 
         {/* legend */}
-        <g transform={`translate(${P}, ${P - 12})`} fontSize="10" fill="hsl(var(--muted-foreground))">
-          <circle cx="4" cy="4" r="3" fill="hsl(var(--primary))" /><text x="12" y="7">Actual</text>
-          <circle cx="64" cy="4" r="3" fill="hsl(var(--muted-foreground))" /><text x="72" y="7">Projected</text>
-          <circle cx="138" cy="4" r="3" fill="hsl(var(--warning))" /><text x="146" y="7">Budget</text>
+        <g transform={`translate(${P}, ${P - 12})`} fontSize="10" fill="var(--muted-foreground)">
+          <circle cx="4" cy="4" r="3" fill="var(--primary)" /><text x="12" y="7">Actual</text>
+          <circle cx="64" cy="4" r="3" fill="var(--muted-foreground)" /><text x="72" y="7">Projected</text>
+          <circle cx="138" cy="4" r="3" fill="var(--warning)" /><text x="146" y="7">Budget</text>
         </g>
       </svg>
     </div>
