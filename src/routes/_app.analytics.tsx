@@ -373,6 +373,8 @@ function AnalyticsPage() {
           </div>
         )}
       </div>
+
+      <NetWorthProjection accounts={accounts} snapshots={snapshots} />
     </div>
   );
 }

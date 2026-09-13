@@ -88,7 +88,7 @@ export function NetWorthProjection({
   }, [accounts, snapshots]);
 
   const chartData = useMemo(() => {
-    const rows: any[] = history.map((h) => ({ ...h }));
+    const rows: any[] = history.map((h) => ({ ...h, bandBase: null, bandSpan: null }));
     for (let m = 0; m <= PROJECTION_MONTHS; m++) {
       const d = addMonths(today, m);
       const label = d.toISOString().slice(0, 7);
